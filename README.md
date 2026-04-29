@@ -101,7 +101,7 @@ Three Podman containers. Three systemd services. One health check timer. No orch
 ## Quick Start
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/zelira.git && cd zelira
+git clone https://github.com/ParkWardRR/zelira.git && cd zelira
 
 # 1. Configure your network
 cp config/env.example config/.env
@@ -165,52 +165,113 @@ zelira/
 └── README.md
 ```
 
-### Data Flow
+### Where Everything Lives on Disk
 
-```
-┌──────────────────────────────────────────────────────────────┐
-│  Client Device                                                │
-│  (laptop, phone, IoT, AP, camera, etc.)                      │
-└──────────┬───────────────────────────────────┬───────────────┘
-           │ DNS query :53                     │ DHCP :67
-           ▼                                   ▼
-┌──────────────────────┐            ┌──────────────────────┐
-│  Pi-hole              │            │  Kea DHCPv4           │
-│  ─────────────────    │            │  ─────────────────    │
-│  Ad-blocking          │            │  IP assignment        │
-│  Query logging        │            │  Static reservations  │
-│  Web UI (:80)         │            │  Lease management     │
-│  Caching layer        │            │  Option 6 → Pi-hole   │
-└──────────┬───────────┘            └──────────────────────┘
-           │ Forward to 127.0.0.1#5335
-           ▼
-┌──────────────────────┐
-│  Unbound              │
-│  ─────────────────    │
-│  Recursive resolver   │
-│  DNSSEC validation    │
-│  serve-expired cache  │
-│  No third-party DNS   │
-└──────────┬───────────┘
-           │ Queries root/TLD servers directly
-           ▼
-┌──────────────────────┐
-│  Root DNS Servers     │
-│  (a.root-servers.net  │
-│   through m.root)     │
-└──────────────────────┘
+```mermaid
+graph TD
+    subgraph host["/srv/ — Persistent Data"]
+        subgraph pihole_data["/srv/pihole/"]
+            etc_pihole["etc-pihole/\nBlocklists, custom DNS,\nPi-hole config"]
+            etc_dnsmasq["etc-dnsmasq.d/\nUpstream config\n(→ Unbound only)"]
+        end
+        subgraph unbound_data["/srv/unbound/"]
+            ub_conf["unbound.conf\nRecursive DNS config\n(production-tuned)"]
+        end
+        subgraph kea_data["/srv/kea/"]
+            kea_conf["etc-kea/\nkea-dhcp4.conf"]
+            kea_leases["lib-kea/\nkea-leases4.csv"]
+            kea_sock["sockets/\nkea.socket (API)"]
+        end
+    end
+
+    subgraph systemd["/etc/systemd/system/"]
+        s1["container-unbound.service"]
+        s2["container-pihole.service"]
+        s3["container-kea-dhcp4.service"]
+        s4["dns-healthcheck.timer"]
+    end
+
+    s1 -.-> ub_conf
+    s2 -.-> etc_pihole
+    s2 -.-> etc_dnsmasq
+    s3 -.-> kea_conf
+    s3 -.-> kea_leases
+
+    style host fill:#1a1a2e,stroke:#4a9eff,color:#fff
+    style systemd fill:#2d1b4e,stroke:#a855f7,color:#fff
+    style pihole_data fill:#96060C22,stroke:#96060C,color:#fff
+    style unbound_data fill:#1A527622,stroke:#1A5276,color:#fff
+    style kea_data fill:#00A98F22,stroke:#00A98F,color:#fff
 ```
 
 ### Service Dependency Chain
 
+```mermaid
+flowchart TD
+    BOOT["🔄 System Boot"] --> UB
+    UB["container-unbound.service\n🔒 Starts first — recursive DNS"] --> |"After + Requires"| PH
+    PH["container-pihole.service\n🛡️ Waits for Unbound"]
+    BOOT --> KEA["container-kea-dhcp4.service\n📋 Independent — starts in parallel"]
+    UB --> |"monitored by"| HC["dns-healthcheck.timer\n⏱️ Every 2 min"]
+    HC --> |"on failure"| RESTART["podman restart unbound\n🔧 Auto-recovery"]
+    RESTART --> UB
+
+    style BOOT fill:#333,color:#fff
+    style UB fill:#1A5276,color:#fff,stroke-width:2px
+    style PH fill:#96060C,color:#fff,stroke-width:2px
+    style KEA fill:#00A98F,color:#fff,stroke-width:2px
+    style HC fill:#22c55e33,stroke:#22c55e,color:#fff
+    style RESTART fill:#ef444433,stroke:#ef4444,color:#fff
 ```
-container-unbound.service          (starts first)
-    ↓
-container-pihole.service           (Requires=unbound, starts after)
-    ↓
-container-kea-dhcp4.service        (independent, starts in parallel)
-    ↓
-dns-healthcheck.timer              (monitors unbound every 2 min)
+
+### What Happens to a DNS Query
+
+This is what happens when any device on your network types `youtube.com` into a browser:
+
+```mermaid
+sequenceDiagram
+    participant C as 📱 Client
+    participant PH as 🛡️ Pi-hole (:53)
+    participant UB as 🔒 Unbound (:5335)
+    participant ROOT as 🌐 Root Servers
+    participant TLD as 📂 .com TLD
+    participant AUTH as 🏢 youtube.com NS
+
+    C->>PH: Where is youtube.com?
+    PH->>PH: Is it on a blocklist? No.
+    PH->>PH: Is it in cache? No.
+    PH->>UB: Forward to Unbound
+    UB->>UB: Is it in cache? No.
+    UB->>ROOT: Who handles .com?
+    ROOT-->>UB: Try a.gtld-servers.net
+    UB->>TLD: Who handles youtube.com?
+    TLD-->>UB: Try ns1.google.com
+    UB->>AUTH: What's the A record for youtube.com?
+    AUTH-->>UB: 142.250.80.46 (DNSSEC signed ✓)
+    UB->>UB: Validate DNSSEC signature ✓
+    UB-->>PH: 142.250.80.46 (cached for TTL)
+    PH->>PH: Cache result
+    PH-->>C: 142.250.80.46
+
+    Note over C,AUTH: Second lookup for youtube.com:
+    C->>PH: Where is youtube.com?
+    PH->>PH: Cache hit!
+    PH-->>C: 142.250.80.46 (< 1ms)
+```
+
+### What Happens to an Ad Request
+
+```mermaid
+sequenceDiagram
+    participant C as 📱 Client
+    participant PH as 🛡️ Pi-hole (:53)
+
+    C->>PH: Where is ads.doubleclick.net?
+    PH->>PH: Check blocklist...
+    PH->>PH: 🚫 BLOCKED (on 1.2M domain blocklist)
+    PH-->>C: 0.0.0.0 (ad never loads)
+
+    Note over C,PH: The ad request dies here.\nNo HTTP connection. No tracking pixel.\nNo bandwidth wasted. Works on every device.\nNo browser extension needed.
 ```
 
 ---
@@ -297,15 +358,27 @@ Kea is the ISC's modern replacement for the legacy `dhcpd`. JSON config, unix so
 
 ## Auto-Recovery
 
-The `dns-healthcheck.timer` runs every 2 minutes and does:
+```mermaid
+flowchart LR
+    TIMER["⏱️ Timer\nevery 2 min"] --> DIG1
+    DIG1{"dig google.com\n@127.0.0.1:5335"} -->|success| DONE["✅ Exit\nDNS healthy"]
+    DIG1 -->|fail| WAIT1["wait 2s"] --> DIG2
+    DIG2{"dig attempt 2"} -->|success| DONE
+    DIG2 -->|fail| WAIT2["wait 2s"] --> DIG3
+    DIG3{"dig attempt 3"} -->|success| DONE
+    DIG3 -->|fail| RESTART["🔧 podman\nrestart unbound"]
+    RESTART --> VERIFY{"dig verify\nafter 5s"}
+    VERIFY -->|success| LOG1["📝 log: recovered"]
+    VERIFY -->|fail| LOG2["🚨 log: still broken\nmanual intervention"]
 
-1. `dig google.com @127.0.0.1 -p 5335` — test Unbound directly
-2. 3 attempts, 2-second gaps between retries
-3. On 3 consecutive failures → `podman restart unbound`
-4. Wait 5 seconds → verify recovery
-5. Log everything to syslog as `dns-healthcheck`
+    style TIMER fill:#22c55e33,stroke:#22c55e,color:#fff
+    style DONE fill:#1a4731,stroke:#22c55e,color:#fff
+    style RESTART fill:#ef444433,stroke:#ef4444,color:#fff
+    style LOG1 fill:#1a4731,stroke:#22c55e,color:#fff
+    style LOG2 fill:#4a1a1a,stroke:#ef4444,color:#fff
+```
 
-This exists because Unbound can enter a state where it responds to nothing after upstream connectivity is restored. See [Pitfall #2](#2-unbound-servfail-death-spiral-after-power-outage).
+This exists because Unbound can enter a SERVFAIL death spiral after upstream connectivity is restored (see [Pitfall #2](#2-unbound-servfail-death-spiral-after-power-outage)). The timer catches this automatically.
 
 ```bash
 # Check auto-recovery history
