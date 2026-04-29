@@ -25,7 +25,7 @@
 
 Every device on your home network needs two things to get online: an **IP address** (so it has an identity on the network) and **DNS** (so it can turn `google.com` into an actual server address). Normally, your ISP's router handles both — poorly. It hands out IPs, and forwards your DNS lookups to your ISP's servers, which are slow, log everything, and serve you ads.
 
-Zelira replaces both of those functions with your own hardware:
+Zelira replaces all of that with your own hardware — and adds time sync, dynamic DNS, and a dashboard on top:
 
 ```mermaid
 flowchart LR
@@ -36,10 +36,15 @@ flowchart LR
             PH["🛡️ Pi-hole\nBlocks ads\nbefore they load"]
             UB["🔒 Unbound\nLooks up domains\ndirectly from\nroot servers"]
             KEA["📋 Kea DHCP\nHands out\nIP addresses"]
+            NTP["🕐 Chrony\nLocal time\nserver"]
+            CADDY["🔒 Caddy\nHTTPS dashboard\n+ reverse proxy"]
+            DDNS["🌐 DDNS\nAuto-updates\npublic IP"]
         end
     end
     
     ROOT["🌐 Root DNS\nServers"]
+    POOL["🕐 NTP Pool"]
+    DNSAPI["📡 DNS Provider\nAPI"]
     
     D -- "what's my IP?" --> KEA
     KEA -- "you're 192.168.1.42" --> D
@@ -49,21 +54,33 @@ flowchart LR
     ROOT -- "142.250.80.46" --> UB
     UB --> PH
     PH -- "here you go" --> D
+    D -- "what time is it?" --> NTP
+    NTP -- "sync" --> POOL
+    D -- "home.mydomain.com" --> CADDY
+    DDNS -- "update A record" --> DNSAPI
     
     style Zelira fill:#1a1a2e,stroke:#4a9eff,stroke-width:2px,color:#fff
     style PH fill:#96060C,color:#fff
     style UB fill:#1A5276,color:#fff
     style KEA fill:#00A98F,color:#fff
+    style NTP fill:#1a3547,stroke:#38bdf8,color:#fff
+    style CADDY fill:#22c55e33,stroke:#22c55e,color:#fff
+    style DDNS fill:#1a3547,stroke:#38bdf8,color:#fff
     style D fill:#333,color:#fff
     style ROOT fill:#1e3a5f,stroke:#4a9eff,color:#fff
+    style POOL fill:#1e3a5f,stroke:#4a9eff,color:#fff
+    style DNSAPI fill:#1e3a5f,stroke:#4a9eff,color:#fff
 ```
 
 **In plain terms:**
 - **Kea** gives every device on your network an IP address (replaces your router's DHCP)
 - **Pi-hole** blocks ads and trackers at the DNS level — before they even start loading — for every device on your network, no browser extensions needed
 - **Unbound** resolves domain names by talking directly to the internet's root DNS servers instead of trusting Google or Cloudflare with your browsing history
+- **Chrony** serves accurate time to every device on your LAN — critical for DNSSEC, TLS, and log correlation
+- **Caddy** provides an HTTPS reverse proxy and dashboard at `https://home.yourdomain.com`
+- **Dynamic DNS** auto-updates your public DNS record when your ISP changes your IP
 
-All three run as containers on a single Linux box (a Raspberry Pi works great). If the power goes out, Zelira heals itself automatically when it comes back.
+The core three (Pi-hole, Unbound, Kea) run as containers on a single Linux box (a Raspberry Pi works great). The add-ons are optional but recommended. If the power goes out, Zelira heals itself automatically when it comes back.
 
 ### Optional Add-ons
 
@@ -200,6 +217,8 @@ zelira/
 │   ├── health-check.sh          # validate everything
 │   ├── dns-healthcheck.sh       # Unbound auto-restart on failure
 │   └── uninstall.sh             # clean removal
+├── testing/
+│   └── README.md                # test environment setup + firewall safety
 ├── docs/
 │   ├── troubleshooting.md       # common issues + debug chain
 │   ├── advanced.md              # DHCP reservations, monitoring, backup
@@ -229,11 +248,17 @@ graph TD
         end
     end
 
+    subgraph host_svc["/etc/ — Host Services (Add-ons)"]
+        chrony_conf["/etc/chrony/chrony.conf\nNTP server config"]
+        caddy_conf["/etc/caddy/Caddyfile\nReverse proxy + TLS"]
+    end
+
     subgraph systemd["/etc/systemd/system/"]
         s1["container-unbound.service"]
         s2["container-pihole.service"]
         s3["container-kea-dhcp4.service"]
         s4["dns-healthcheck.timer"]
+        s5["container-ddns.service"]
     end
 
     s1 -.-> ub_conf
@@ -243,10 +268,13 @@ graph TD
     s3 -.-> kea_leases
 
     style host fill:#1a1a2e,stroke:#4a9eff,color:#fff
+    style host_svc fill:#1a1a2e,stroke:#22c55e,stroke-dasharray:5 5,color:#fff
     style systemd fill:#2d1b4e,stroke:#a855f7,color:#fff
     style pihole_data fill:#96060C22,stroke:#96060C,color:#fff
     style unbound_data fill:#1A527622,stroke:#1A5276,color:#fff
     style kea_data fill:#00A98F22,stroke:#00A98F,color:#fff
+    style chrony_conf fill:#1a354722,stroke:#38bdf8,color:#fff
+    style caddy_conf fill:#22c55e22,stroke:#22c55e,color:#fff
 ```
 
 ### Service Dependency Chain
@@ -261,12 +289,20 @@ flowchart TD
     HC --> |"on failure"| RESTART["podman restart unbound\n🔧 Auto-recovery"]
     RESTART --> UB
 
+    BOOT --> NTP["chrony.service\n🕐 NTP time server"]
+    BOOT --> CADDY["caddy.service\n🔒 Reverse proxy + TLS"]
+    BOOT --> DDNS["container-ddns.service\n🌐 Dynamic DNS updater"]
+    CADDY -.-> |"proxies"| PH
+
     style BOOT fill:#333,color:#fff
     style UB fill:#1A5276,color:#fff,stroke-width:2px
     style PH fill:#96060C,color:#fff,stroke-width:2px
     style KEA fill:#00A98F,color:#fff,stroke-width:2px
     style HC fill:#22c55e33,stroke:#22c55e,color:#fff
     style RESTART fill:#ef444433,stroke:#ef4444,color:#fff
+    style NTP fill:#1a3547,stroke:#38bdf8,color:#fff
+    style CADDY fill:#22c55e33,stroke:#22c55e,color:#fff
+    style DDNS fill:#1a3547,stroke:#38bdf8,color:#fff
 ```
 
 ### What Happens to a DNS Query
@@ -398,6 +434,40 @@ The deploy script creates `/srv/pihole/etc-dnsmasq.d/99-zelira-upstream.conf` wh
 | Control socket | `/srv/kea/sockets/kea.socket` |
 
 Kea is the ISC's modern replacement for the legacy `dhcpd`. JSON config, unix socket API, memfile lease storage. The config template is populated from your `.env` at deploy time via `envsubst`.
+
+### Chrony — NTP Time Server *(add-on)*
+
+| | |
+|---|---|
+| Type | Host service (not containerized) |
+| Port | `123/UDP` |
+| Config | `/etc/chrony/chrony.conf` |
+| Upstream | `pool.ntp.org` (stratum 2-3) |
+| Guide | [docs/addon-ntp.md](docs/addon-ntp.md) |
+
+Serves accurate time to every device on your LAN. Critical for DNSSEC validation, TLS certificate checks, and log correlation. Kea can advertise this server via DHCP Option 42.
+
+### Dynamic DNS — DDNS Updater *(add-on)*
+
+| | |
+|---|---|
+| Image | `docker.io/linuxshots/namecheap-ddns` (or Cloudflare/DuckDNS) |
+| Network | host mode (outbound HTTPS only) |
+| Config | Env vars in `config/.env` |
+| Guide | [docs/addon-ddns.md](docs/addon-ddns.md) |
+
+Auto-updates a public DNS A record when your ISP changes your IP. No inbound ports required — makes a single HTTPS call every 5 minutes.
+
+### Caddy — Reverse Proxy & Dashboard *(add-on)*
+
+| | |
+|---|---|
+| Type | Host service (not containerized) |
+| Ports | `443/TCP` (HTTPS), `80/TCP` (redirect) |
+| Config | `/etc/caddy/Caddyfile` |
+| Guide | [docs/addon-dashboard.md](docs/addon-dashboard.md) |
+
+Provides auto-TLS HTTPS for Pi-hole's web UI and an optional dashboard at `https://home.yourdomain.com`. Handles certificate renewal automatically — no certbot or cron needed.
 
 ---
 
