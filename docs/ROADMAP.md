@@ -104,14 +104,39 @@ The decision to publish came from realizing that every "Pi-hole + Unbound" guide
 | 🟡 | **Fedora/RHEL testing** | Validate on Fedora 40+, AlmaLinux 9 |
 | 🟡 | **Docker fallback** | Optional Docker-compatible mode for non-Podman hosts |
 
+### Phase 7 — Go CLI *(in progress)*
+
+Replace shell scripts with a single static binary. Cross-compiled for arm64 + amd64.
+
+```
+zelira deploy              # full stack deploy (idempotent)
+zelira health              # run all health checks
+zelira health --json       # structured output for monitoring
+zelira addon ntp           # deploy Chrony NTP add-on
+zelira addon ddns          # deploy Dynamic DNS add-on
+zelira addon dashboard     # deploy Caddy dashboard add-on
+zelira status              # container + service status
+zelira status --json       # machine-readable for Prometheus/scripts
+zelira uninstall           # clean removal
+```
+
+| Status | Item | Description |
+|--------|------|-------------|
+| ✅ | **CLI scaffold** | cobra-based subcommands, root flags |
+| 🔴 | **`zelira health`** | Port health-check.sh logic to native Go (DNS, NTP, ports, certs) |
+| 🔴 | **`zelira deploy`** | Port deploy.sh config validation + orchestration |
+| 🔴 | **`zelira addon`** | Port add-on deploy scripts |
+| 🟡 | **`--json` output** | Structured JSON for all commands |
+| 🟡 | **Cross-compilation** | `GOOS=linux GOARCH=arm64` + `amd64` release binaries |
+| 🟢 | **GitHub Releases** | Automated binary builds via GitHub Actions |
+
 ### Future
 
 | Priority | Item | Description |
 |----------|------|-------------|
 | 🟢 | **NixOS module** | Declarative deployment |
-| 🟢 | **Ansible playbook** | Config management alternative to shell scripts |
+| 🟢 | **Ansible playbook** | Config management alternative |
 | 🟢 | **`deploy-metrics.sh`** | One-command Prometheus exporter setup |
-| 🟢 | **Comparison page** | Zelira vs. Technitium vs. AdGuard Home |
 
 ---
 
