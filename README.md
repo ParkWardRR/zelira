@@ -725,11 +725,15 @@ Edit `/srv/kea/etc-kea/kea-dhcp4.conf` and add entries to the `reservations` arr
 ## Further Reading
 
 - [Roadmap](docs/ROADMAP.md) — project history, current validation status, forward-looking plans
+- [Migration from Docker Compose](docs/migration-from-docker.md) — step-by-step guide from Pi-hole Docker → Zelira
 - [Troubleshooting](docs/troubleshooting.md) — common issues, debug chain, log commands
 - [Advanced Configuration](docs/advanced.md) — DHCP reservations, monitoring, backup, DNS-only mode, security hardening
 - [Add-on: NTP Time Server](docs/addon-ntp.md) — Chrony setup, DHCP Option 42, Prometheus metrics
 - [Add-on: Dynamic DNS](docs/addon-ddns.md) — Namecheap, Cloudflare, DuckDNS auto-updaters
 - [Add-on: Landing Page & Reverse Proxy](docs/addon-dashboard.md) — Caddy, auto-TLS, dashboard options
+- [Add-on: Observability & Metrics](docs/addon-metrics.md) — Prometheus exporters, Grafana dashboards
+- [Example Configs](config/examples/) — pre-built `.env` files for apartment, house, and homelab setups
+- [Contributing](CONTRIBUTING.md) — how to contribute, code style, PR process
 
 ---
 

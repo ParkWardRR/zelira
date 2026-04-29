@@ -69,17 +69,26 @@ Every config value and auto-recovery mechanism in this repo exists because somet
 | ✅ | **Kea config validation** | JSON syntax check via `python3 -m json.tool` after envsubst + comment stripping |
 | ✅ | **systemd-resolved detection** | Auto-detects if resolved is on port 53; prompts user with fix instructions |
 
-### Phase 4 — Add-on Integration *(in progress)*
+### Phase 4 — Add-on Integration ✅ *(completed 2026-04-29)*
 
-| Status | Item | Description |
-|--------|------|-------------|
+| Status | Item | Result |
+|--------|------|--------|
 | ✅ | **Add-on deploy scripts** | `deploy-ntp.sh`, `deploy-ddns.sh`, `deploy-dashboard.sh` — all idempotent |
 | ✅ | **Unified `.env`** | Add-on config (NTP, DDNS, Caddy) in `env.example` with optional sections |
 | ✅ | **Kea Option 42** | `deploy-ntp.sh` auto-injects NTP server IP into Kea config via python3 JSON |
-| 🟡 | **Health check expansion** | NTP sync, DDNS update age, Caddy cert expiry in `health-check.sh` |
-| 🟢 | **Prometheus metrics** | Export Pi-hole, Unbound, Kea, Chrony metrics for Grafana |
+| ✅ | **Health check expansion** | NTP (stratum, offset, sources), DDNS (container, logs), Caddy (TLS expiry, HTTP response) |
+| ✅ | **Metrics framework** | Documented in [addon-metrics.md](addon-metrics.md) — Prometheus textfile + container exporters |
 
-### Phase 5 — Multi-Platform
+### Phase 5 — Community ✅ *(completed 2026-04-29)*
+
+| Status | Item | Result |
+|--------|------|--------|
+| ✅ | **Contributing guide** | [CONTRIBUTING.md](../CONTRIBUTING.md) — ground rules, code style, PR process, issue templates |
+| ✅ | **Example configs** | `config/examples/` — apartment, house, homelab-with-VLANs `.env` files |
+| ✅ | **Migration guide** | [migration-from-docker.md](migration-from-docker.md) — Docker Compose Pi-hole → Zelira step-by-step |
+| 🟡 | **CI/CD** | GitHub Actions: ShellCheck, isolated DHCP test |
+
+### Phase 6 — Multi-Platform *(future)*
 
 | Priority | Item | Description |
 |----------|------|-------------|
@@ -87,15 +96,6 @@ Every config value and auto-recovery mechanism in this repo exists because somet
 | 🟡 Medium | **Docker fallback** | Optional Docker-compatible mode |
 | 🟢 Low | **NixOS module** | Declarative deployment |
 | 🟢 Low | **Ansible playbook** | Config management alternative to shell scripts |
-
-### Phase 6 — Community
-
-| Priority | Item | Description |
-|----------|------|-------------|
-| 🟡 Medium | **CI/CD** | GitHub Actions: lint, ShellCheck, isolated DHCP test |
-| 🟡 Medium | **Contributing guide** | `CONTRIBUTING.md` with issue templates, PR standards |
-| 🟢 Low | **Example configs** | Pre-built `.env` for common setups (apartment, house, homelab) |
-| 🟢 Low | **Migration guide** | Pi-hole Docker Compose → Zelira |
 
 ---
 
