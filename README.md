@@ -724,6 +724,7 @@ Edit `/srv/kea/etc-kea/kea-dhcp4.conf` and add entries to the `reservations` arr
 
 ## Further Reading
 
+- [Roadmap](docs/ROADMAP.md) — project history, current validation status, forward-looking plans
 - [Troubleshooting](docs/troubleshooting.md) — common issues, debug chain, log commands
 - [Advanced Configuration](docs/advanced.md) — DHCP reservations, monitoring, backup, DNS-only mode, security hardening
 - [Add-on: NTP Time Server](docs/addon-ntp.md) — Chrony setup, DHCP Option 42, Prometheus metrics
