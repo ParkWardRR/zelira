@@ -1,101 +1,117 @@
 # Zelira — Roadmap
 
-> History, current state, and where this project is headed.
+> Project history, current status, and what's next.
 
 ---
 
-## Origin Story
+## Design Principles
 
-Zelira was extracted from a production home network stack that ran for months before being generalized. The original deployment served 40+ clients across managed switches, WiFi APs, cameras, IoT devices, and hypervisors — all depending on a single Raspberry Pi 5 for DNS and DHCP.
-
-Every config value and auto-recovery mechanism in this repo exists because something broke in production. The decision to publish came from realizing that every "Pi-hole + Unbound" guide online stops at `docker-compose up` and never addresses real failure modes: power outages, TCP connection storms, silent config conflicts, or wrong boot ordering.
+1. **Every config value has a reason.** If a value is set, there's a production incident behind it.
+2. **One command to deploy, one command to verify.** `sudo ./deploy.sh` and `./scripts/health-check.sh`.
+3. **No external dependencies at runtime.** DNS from root servers. DHCP is local. NTP from pool.ntp.org.
+4. **Survive power outages gracefully.** Stale cache, auto-recovery timers, correct boot ordering.
+5. **Podman + systemd, not Docker + Compose.** Fewer moving parts, no daemon.
+6. **Document the failures, not just the successes.**
 
 ---
 
-## Timeline
+## Origin
 
-### Phase 0 — Production Hardening (pre-release)
+Zelira was extracted from a production home network stack — 40+ clients, 7 APs, managed switches, NVR cameras, IoT devices, and hypervisors — all depending on a single Raspberry Pi 5 for DNS and DHCP. Every config value and auto-recovery mechanism exists because something broke in production.
+
+The decision to publish came from realizing that every "Pi-hole + Unbound" guide online stops at `docker-compose up` and never addresses what happens when the power goes out, when Unbound's infra cache poisons itself, or when Pi-hole's FTL engine silently drops 105 TCP connections per hour.
+
+---
+
+## What's Been Done
+
+### Phase 0 — Production Hardening
+
+*Running on a real network for months before Zelira existed as a project.*
 
 | Event | Impact |
 |-------|--------|
 | Pi-hole + Unbound deployed on RPi5 (arm64, 8 GB) | Core DNS operational |
 | Migrated Docker + Compose → Podman + systemd | Eliminated daemon as single point of failure |
 | Migrated ISC DHCP (`dhcpd`) → Kea DHCPv4 | ISC DHCP end-of-life; Kea has JSON config + REST API |
-| DHCP Snooping on managed switch silently dropped Kea packets | Documented as Pitfall #4 |
-| **Incident:** Unbound SERVFAIL death spiral after power outage | `infra-host-ttl` default (900s) caused 15-min blackout; fixed with `60` + `serve-expired` |
-| Deployed `dns-healthcheck.timer` | Auto-restarts Unbound after 3 consecutive failures |
-| **Incident:** Pi-hole FTL TCP connection storms — 105 errors/hr | Unbound `tcp-idle-timeout` default 10s; fixed with `120000` |
-| **Incident:** Device unreachable by hostname after DHCP migration | Pi-hole v6 dual DNS source (`custom.list` vs `pihole.toml`); TOML wins silently |
-| Kea exporter crash loop | Control socket missing from config; fixed with `chmod 666` on socket |
-| Added Caddy + DNS-01 challenge for local HTTPS | Landing page and Pi-hole admin behind TLS |
-| Added Dynamic DNS updater container | Auto-updates public A record every 5 min |
-| Added Chrony NTP | Local time server for all LAN devices; critical for DNSSEC |
+| **Incident:** Unbound SERVFAIL death spiral after power outage | Fixed with `infra-host-ttl: 60` + `serve-expired` + auto-recovery timer |
+| **Incident:** Pi-hole FTL TCP connection storms (105/hr) | Fixed with `tcp-idle-timeout: 120000` + `incoming-num-tcp: 20` |
+| **Incident:** Pi-hole v6 dual DNS source conflict | Documented as Pitfall #3 |
+| DHCP Snooping dropped Kea packets on managed switch | Documented as Pitfall #4 |
+| Kea exporter crash loop (missing control socket) | Fixed in default Kea template |
+| Added Caddy, Dynamic DNS, Chrony NTP | Full stack for production homelab |
 
-### Phase 1 — Public Release *(current)*
+### Phase 1 — Public Release
 
 | Date | Commit | Milestone |
 |------|--------|-----------|
 | 2026-04-29 | `fbd6f98` | Initial release: core stack, deploy script, health check, uninstall |
 | 2026-04-29 | `2eb4429` | Mermaid diagrams: DNS flow, ad-blocking, auto-recovery, boot chain |
 | 2026-04-29 | `490b8c7` | Add-on docs: NTP (Chrony), Dynamic DNS, Landing Page (Caddy) |
-| 2026-04-29 | `6be7d5d` | Testing framework: isolated DHCP test, firewall safety, expanded README |
+| 2026-04-29 | `6be7d5d` | Testing framework: isolated DHCP test, firewall safety |
 
-### Phase 2 — Validation ✅ *(completed 2026-04-29)*
+### Phase 2 — Validation ✅
 
-| Status | Item | Result |
-|--------|------|--------|
-| ✅ | Test host provisioned (openSUSE Leap 16.0, Podman 5.4.2) | `zeliratest` at `172.16.6.142` |
-| ✅ | Firewall safety: DHCP blocked on LAN via `firewalld` direct rules | 4 persistent rules survived reboot |
-| ✅ | Isolated DHCP test: Kea hands out leases inside podman internal network | Full DISCOVER→OFFER→REQUEST→ACK verified |
-| ✅ | Full `deploy.sh` end-to-end on test host | 15/15 health checks passed; found & fixed 3 bugs (envsubst export, JSON comments, socket perms) |
-| ✅ | DNS validation: Pi-hole → Unbound → root servers (DNSSEC verified) | Recursive resolution, RRSIG records present, `ads.google.com → 0.0.0.0` |
-| ✅ | Health check timer: simulate Unbound failure, confirm auto-recovery | `podman stop unbound` → systemd auto-restarted → DNS restored in <10s |
-| ✅ | Boot ordering: cold reboot, verify Unbound → Pi-hole → Kea sequence | All 3 containers started within 1s of each other, healthy after reboot |
-| ✅ | Add-on validation: Chrony NTP | 7 sources, stratum 4, <1ms offset, LAN access configured |
+*Full end-to-end testing on `zeliratest` (openSUSE Leap 16.0, Podman 5.4.2).*
 
-> Full test log: [testing/results/phase2-validation-2026-04-29.md](../testing/results/phase2-validation-2026-04-29.md)
+| Test | Result |
+|------|--------|
+| Full `deploy.sh` end-to-end | 15/15 health checks; found & fixed 3 bugs |
+| DNS: Pi-hole → Unbound → root servers (DNSSEC) | Recursive resolution, RRSIG verified, ads blocked |
+| Auto-recovery: kill Unbound, verify restart | systemd auto-restarted in <10s |
+| Boot ordering: cold reboot | All containers healthy, firewall persisted |
+| Chrony NTP | 7 sources, stratum 3, <1ms offset |
+
+> Full log: [testing/results/phase2-validation-2026-04-29.md](../testing/results/phase2-validation-2026-04-29.md)
+
+### Phase 3 — Hardening ✅
+
+| Item | Result |
+|------|--------|
+| `deploy.sh` idempotency | Cached image skipping, safe re-runs, existing service detection |
+| Multi-distro support | apt/zypper/dnf detection for podman, dig, envsubst |
+| Config validation | IP/CIDR/interface/port conflict pre-flight checks |
+| Kea JSON validation | `python3 -m json.tool` after envsubst + comment stripping |
+| systemd-resolved detection | Auto-detects port 53 conflict; prompts user with fix |
+
+### Phase 4 — Add-on Integration ✅
+
+| Item | Result |
+|------|--------|
+| Add-on deploy scripts | `deploy-ntp.sh`, `deploy-ddns.sh`, `deploy-dashboard.sh` — all idempotent |
+| Unified `.env` | Add-on config in `env.example` with optional sections |
+| Kea Option 42 | `deploy-ntp.sh` auto-injects NTP server IP into Kea config |
+| Health check expansion | NTP (stratum, offset, sources), DDNS (container, logs), Caddy (TLS expiry, HTTP) |
+| Metrics framework | Documented in [addon-metrics.md](addon-metrics.md) |
+
+### Phase 5 — Community ✅
+
+| Item | Result |
+|------|--------|
+| Contributing guide | [CONTRIBUTING.md](../CONTRIBUTING.md) — ground rules, code style, PR process |
+| Example configs | `config/examples/` — apartment, house, homelab-with-VLANs |
+| Migration guide | [migration-from-docker.md](migration-from-docker.md) — Docker Compose → Zelira |
 
 ---
 
-## Forward Roadmap
+## What's Next
 
-### Phase 3 — Hardening ✅ *(completed 2026-04-29)*
-
-| Status | Item | Result |
-|--------|------|--------|
-| ✅ | **`deploy.sh` idempotency** | Cached image skipping, safe re-runs, existing service detection |
-| ✅ | **openSUSE compatibility** | Multi-distro package detection: apt/zypper/dnf for podman, dig, envsubst |
-| ✅ | **Config validation** | IP/CIDR/interface/port conflict pre-flight checks with clear error messages |
-| ✅ | **Kea config validation** | JSON syntax check via `python3 -m json.tool` after envsubst + comment stripping |
-| ✅ | **systemd-resolved detection** | Auto-detects if resolved is on port 53; prompts user with fix instructions |
-
-### Phase 4 — Add-on Integration ✅ *(completed 2026-04-29)*
-
-| Status | Item | Result |
-|--------|------|--------|
-| ✅ | **Add-on deploy scripts** | `deploy-ntp.sh`, `deploy-ddns.sh`, `deploy-dashboard.sh` — all idempotent |
-| ✅ | **Unified `.env`** | Add-on config (NTP, DDNS, Caddy) in `env.example` with optional sections |
-| ✅ | **Kea Option 42** | `deploy-ntp.sh` auto-injects NTP server IP into Kea config via python3 JSON |
-| ✅ | **Health check expansion** | NTP (stratum, offset, sources), DDNS (container, logs), Caddy (TLS expiry, HTTP response) |
-| ✅ | **Metrics framework** | Documented in [addon-metrics.md](addon-metrics.md) — Prometheus textfile + container exporters |
-
-### Phase 5 — Community ✅ *(completed 2026-04-29)*
-
-| Status | Item | Result |
-|--------|------|--------|
-| ✅ | **Contributing guide** | [CONTRIBUTING.md](../CONTRIBUTING.md) — ground rules, code style, PR process, issue templates |
-| ✅ | **Example configs** | `config/examples/` — apartment, house, homelab-with-VLANs `.env` files |
-| ✅ | **Migration guide** | [migration-from-docker.md](migration-from-docker.md) — Docker Compose Pi-hole → Zelira step-by-step |
-| 🟡 | **CI/CD** | GitHub Actions: ShellCheck, isolated DHCP test |
-
-### Phase 6 — Multi-Platform *(future)*
+### Near-Term
 
 | Priority | Item | Description |
 |----------|------|-------------|
-| 🟡 Medium | **Fedora/RHEL support** | Test on Fedora 40+, AlmaLinux 9 |
-| 🟡 Medium | **Docker fallback** | Optional Docker-compatible mode |
-| 🟢 Low | **NixOS module** | Declarative deployment |
-| 🟢 Low | **Ansible playbook** | Config management alternative to shell scripts |
+| 🟡 | **CI/CD** | GitHub Actions: ShellCheck, isolated DHCP test |
+| 🟡 | **Fedora/RHEL testing** | Validate on Fedora 40+, AlmaLinux 9 |
+| 🟡 | **Docker fallback** | Optional Docker-compatible mode for non-Podman hosts |
+
+### Future
+
+| Priority | Item | Description |
+|----------|------|-------------|
+| 🟢 | **NixOS module** | Declarative deployment |
+| 🟢 | **Ansible playbook** | Config management alternative to shell scripts |
+| 🟢 | **`deploy-metrics.sh`** | One-command Prometheus exporter setup |
+| 🟢 | **Comparison page** | Zelira vs. Technitium vs. AdGuard Home |
 
 ---
 
@@ -125,14 +141,3 @@ Every Zelira feature traces back to a real failure:
 | **DoH / DoT** | Zelira resolves recursively — no upstream to encrypt to |
 | **Container orchestration** | No Kubernetes, no Compose. systemd is the orchestrator |
 | **VPN integration** | DNS/DHCP concern only; VPN belongs on the router |
-
----
-
-## Design Principles
-
-1. **Every config value has a reason.** If a value is set, there's a production incident behind it.
-2. **One command to deploy, one command to verify.** `sudo ./deploy.sh` and `./scripts/health-check.sh`.
-3. **No external dependencies at runtime.** DNS from root servers. DHCP is local. NTP from pool.ntp.org.
-4. **Survive power outages gracefully.** Stale cache, auto-recovery timers, correct boot ordering.
-5. **Podman + systemd, not Docker + Compose.** Fewer moving parts, no daemon.
-6. **Document the failures, not just the successes.**

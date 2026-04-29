@@ -1,8 +1,8 @@
 <p align="center">
   <h1 align="center">Zelira</h1>
   <p align="center">
-    Containerized DNS + DHCP for homelabs.<br/>
-    Pi-hole · Unbound · Kea — zero dependencies, one command.
+    Production-hardened DNS + DHCP for homelabs.<br/>
+    Pi-hole · Unbound · Kea · NTP · DDNS · Dashboard — one command.
   </p>
 </p>
 
@@ -162,20 +162,30 @@ Three Podman containers. Three systemd services. One health check timer. No orch
 ```bash
 git clone https://github.com/ParkWardRR/zelira.git && cd zelira
 
-# 1. Configure your network
-cp config/env.example config/.env
+# 1. Configure your network (or start from an example)
+cp config/env.example config/.env    # blank template
+# cp config/examples/apartment.env config/.env   # simple /24
+# cp config/examples/house.env config/.env       # /23 + DDNS
+# cp config/examples/homelab.env config/.env     # /16 + VLANs + TLS
 vi config/.env
 
-# 2. Deploy everything
+# 2. Deploy core stack (DNS + DHCP)
 sudo ./deploy.sh
 
 # 3. Verify
 ./scripts/health-check.sh
+
+# 4. Optional add-ons
+sudo ./scripts/deploy-ntp.sh         # NTP time server (Chrony)
+sudo ./scripts/deploy-ddns.sh        # Dynamic DNS updater
+sudo ./scripts/deploy-dashboard.sh   # Caddy dashboard + reverse proxy
 ```
 
 Then either:
 - Point your router's DHCP to hand out this host's IP as the DNS server, **or**
 - Disable your router's DHCP entirely and let Kea handle it
+
+> **Migrating from Docker Compose?** See [docs/migration-from-docker.md](docs/migration-from-docker.md) for a step-by-step guide.
 
 ---
 
@@ -183,10 +193,10 @@ Then either:
 
 | Dependency | Version | Install | Why |
 |-----------|---------|---------|-----|
-| Linux | Debian 12+, Ubuntu 22.04+, Fedora 38+ | — | Host OS |
-| Podman | 4.0+ | `apt install podman` | Container runtime |
-| dig | any | `apt install dnsutils` | Health checks |
-| envsubst | any | `apt install gettext-base` | Kea config templating |
+| Linux | Debian 12+, Ubuntu 22.04+, openSUSE 16+, Fedora 38+ | — | Host OS |
+| Podman | 4.0+ | `apt install podman` / `zypper install podman` / `dnf install podman` | Container runtime |
+| dig | any | `apt install dnsutils` / `zypper install bind-utils` | Health checks |
+| envsubst | any | `apt install gettext-base` / `zypper install gettext-runtime` | Kea config templating |
 | Static IP | — | Configure before deploying | This box IS your DNS/DHCP server |
 
 ### Tested Platforms
@@ -195,6 +205,7 @@ Then either:
 |----------|-----|-----|--------|
 | Raspberry Pi 5 | BCM2712 (arm64) | 8 GB | ✅ Primary target |
 | Raspberry Pi 4 | BCM2711 (arm64) | 4 GB | ✅ Works (4 GB minimum) |
+| openSUSE Leap 16.0 | x86_64 | 2 GB | ✅ Validated (Phase 2 test host) |
 | Intel NUC | x86_64 | 8 GB | ✅ Works |
 | Proxmox VM | x86_64 | 2 GB+ | ✅ Works |
 | Any Debian/Ubuntu box | arm64 or amd64 | 2 GB+ | ✅ Should work |
@@ -205,27 +216,39 @@ Then either:
 
 ```
 zelira/
+├── deploy.sh                        # one-command deploy (idempotent)
 ├── config/
-│   ├── env.example              # ← copy to .env and edit
-│   ├── unbound.conf             # recursive DNS (production-tuned)
-│   └── kea-dhcp4.conf.template  # DHCP (templated from .env)
-├── systemd/
-│   ├── dns-healthcheck.service  # auto-recovery oneshot
-│   └── dns-healthcheck.timer    # runs every 2 min
+│   ├── env.example                  # ← copy to .env and edit
+│   ├── unbound.conf                 # recursive DNS (production-tuned)
+│   ├── kea-dhcp4.conf.template      # DHCP config (templated from .env)
+│   └── examples/
+│       ├── apartment.env            # simple /24, 10-20 devices
+│       ├── house.env                # /23, DDNS, dashboard
+│       └── homelab.env              # /16 with VLANs, TLS, full add-ons
 ├── scripts/
-│   ├── deploy.sh                # one-shot installer
-│   ├── health-check.sh          # validate everything
-│   ├── dns-healthcheck.sh       # Unbound auto-restart on failure
-│   └── uninstall.sh             # clean removal
+│   ├── health-check.sh              # validate everything (core + add-ons)
+│   ├── dns-healthcheck.sh           # Unbound auto-restart on failure
+│   ├── deploy-ntp.sh                # add-on: Chrony NTP time server
+│   ├── deploy-ddns.sh               # add-on: Dynamic DNS (Namecheap/CF/DuckDNS)
+│   ├── deploy-dashboard.sh          # add-on: Caddy reverse proxy + dashboard
+│   └── uninstall.sh                 # clean removal
+├── systemd/
+│   ├── dns-healthcheck.service      # auto-recovery oneshot
+│   └── dns-healthcheck.timer        # runs every 2 min
 ├── testing/
-│   └── README.md                # test environment setup + firewall safety
+│   ├── README.md                    # test environment setup + firewall safety
+│   └── results/                     # validation test logs
 ├── docs/
-│   ├── troubleshooting.md       # common issues + debug chain
-│   ├── advanced.md              # DHCP reservations, monitoring, backup
-│   ├── addon-ntp.md             # add-on: Chrony NTP time server
-│   ├── addon-ddns.md            # add-on: Dynamic DNS updater
-│   └── addon-dashboard.md       # add-on: Caddy reverse proxy + landing page
-├── LICENSE.md                   # Blue Oak Model License 1.0.0
+│   ├── ROADMAP.md                   # project history + forward plans
+│   ├── troubleshooting.md           # common issues + debug chain
+│   ├── advanced.md                  # DHCP reservations, monitoring, backup
+│   ├── migration-from-docker.md     # Docker Compose → Zelira migration
+│   ├── addon-ntp.md                 # NTP setup guide
+│   ├── addon-ddns.md                # Dynamic DNS setup guide
+│   ├── addon-dashboard.md           # Caddy + dashboard setup guide
+│   └── addon-metrics.md             # Prometheus + Grafana framework
+├── CONTRIBUTING.md                  # contributor guide + PR process
+├── LICENSE.md                       # Blue Oak Model License 1.0.0
 └── README.md
 ```
 
@@ -508,16 +531,16 @@ journalctl -t dns-healthcheck --since "24 hours ago"
 ./scripts/health-check.sh
 ```
 
-Output:
+Output (with NTP add-on deployed):
 
 ```
 Zelira Health Check
 ═══════════════════
 
 Containers:
-  ✓ unbound (Up 7 weeks)
-  ✓ pihole (Up 33 hours)
-  ✓ kea-dhcp4 (Up 33 hours)
+  ✓ unbound (Up 18 minutes)
+  ✓ pihole (Up 18 minutes)
+  ✓ kea-dhcp4 (Up 18 minutes)
 
 Systemd:
   ✓ container-unbound
@@ -527,7 +550,7 @@ Systemd:
 
 DNS:
   ✓ Unbound (127.0.0.1:5335) → 142.251.218.14
-  ✓ Pi-hole (127.0.0.1:53) → 142.251.218.14
+  ✓ Pi-hole (127.0.0.1:53) → 142.251.40.110
   ✓ DNSSEC validation working
   ✓ Ad-blocking active (ads.google.com → blocked)
 
@@ -537,10 +560,18 @@ Ports:
   ✓ Port 5335 (Unbound)
   ✓ Port 67 (DHCP)
 
+NTP (Chrony):
+  ✓ 7 source(s) configured, 7 reachable
+  ✓ Stratum 3 (valid)
+  ✓ Clock offset: 0.004ms
+  ✓ Port 123/UDP (NTP) listening
+
 ═══════════════════
-Results: 12 passed, 0 failed, 0 warnings
+Results: 19 passed, 0 failed, 0 warnings
 Status: HEALTHY
 ```
+
+The health check auto-detects deployed add-ons. Core-only installs show 15 checks; with NTP/DDNS/Caddy add-ons it expands up to 19+.
 
 ---
 
@@ -661,20 +692,25 @@ And `deploy.sh` adds a 3-second sleep between starting Unbound and Pi-hole to le
 ## Updating
 
 ```bash
-sudo podman pull docker.io/pihole/pihole:latest
-sudo podman pull docker.io/klutchell/unbound:latest
-sudo podman pull docker.io/jonasal/kea-dhcp4:2.6
-
-# Restart in dependency order
-sudo systemctl restart container-unbound
-sleep 3
-sudo systemctl restart container-pihole container-kea-dhcp4
+# Re-run deploy with fresh images (idempotent — safe to run anytime)
+sudo ./deploy.sh --force-pull
 
 # Verify
 ./scripts/health-check.sh
 ```
 
-Always restart Unbound first, wait, then restart Pi-hole. Restarting them simultaneously causes Pi-hole to fail its initial Unbound connection.
+Or update manually:
+
+```bash
+sudo podman pull docker.io/pihole/pihole:latest
+sudo podman pull docker.io/klutchell/unbound:latest
+sudo podman pull docker.io/jonasal/kea-dhcp4:2.6
+
+# Restart in dependency order (Unbound first, then Pi-hole)
+sudo systemctl restart container-unbound
+sleep 3
+sudo systemctl restart container-pihole container-kea-dhcp4
+```
 
 ---
 
