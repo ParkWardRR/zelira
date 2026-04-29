@@ -1,0 +1,7 @@
+[Unit]
+Description=Zelira — DNS Health Check
+After=container-unbound.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/dns-healthcheck.sh

@@ -1,0 +1,22 @@
+# Zelira .gitignore
+
+# User env (contains passwords)
+config/.env
+
+# Pi-hole runtime data
+config/pihole/
+
+# Kea generated config (from template)
+# The template is tracked, the generated output is not
+/srv/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
