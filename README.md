@@ -206,7 +206,7 @@ Then either:
 
 | Dependency | Version | Install | Why |
 |-----------|---------|---------|-----|
-| Linux | Debian 12+, Ubuntu 22.04+, openSUSE 16+, Fedora 38+ | — | Host OS |
+| Linux | Debian 12+, Ubuntu 22.04+, openSUSE 16+, Fedora 38+, AlmaLinux/RHEL 10+ | — | Host OS |
 | Podman | 4.0+ | `apt install podman` / `zypper install podman` / `dnf install podman` | Container runtime |
 | dig | any | `apt install dnsutils` / `zypper install bind-utils` | Health checks |
 | envsubst | any | `apt install gettext-base` / `zypper install gettext-runtime` | Kea config templating |
@@ -219,6 +219,7 @@ Then either:
 | Raspberry Pi 5 | BCM2712 (arm64) | 8 GB | ✅ Primary target |
 | Raspberry Pi 4 | BCM2711 (arm64) | 4 GB | ✅ Works (4 GB minimum) |
 | openSUSE Leap 16.0 | x86_64 | 2 GB | ✅ Validated (Phase 2 test host) |
+| AlmaLinux 10.1 | x86_64 | 2 GB | ✅ Validated (Go CLI + full stack) |
 | Intel NUC | x86_64 | 8 GB | ✅ Works |
 | Proxmox VM | x86_64 | 2 GB+ | ✅ Works |
 | Any Debian/Ubuntu box | arm64 or amd64 | 2 GB+ | ✅ Should work |
