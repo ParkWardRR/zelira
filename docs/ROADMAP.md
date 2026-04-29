@@ -40,18 +40,20 @@ Every config value and auto-recovery mechanism in this repo exists because somet
 | 2026-04-29 | `490b8c7` | Add-on docs: NTP (Chrony), Dynamic DNS, Landing Page (Caddy) |
 | 2026-04-29 | `6be7d5d` | Testing framework: isolated DHCP test, firewall safety, expanded README |
 
-### Phase 2 — Validation *(in progress)*
+### Phase 2 — Validation ✅ *(completed 2026-04-29)*
 
-| Status | Item |
-|--------|------|
-| ✅ | Test host provisioned (openSUSE Leap 16.0, Podman 5.4.2) |
-| ✅ | Firewall safety: DHCP blocked on LAN via `firewalld` direct rules |
-| ✅ | Isolated DHCP test: Kea hands out leases inside podman internal network |
-| ⬜ | Full `deploy.sh` end-to-end on clean Debian 12 |
-| ⬜ | DNS validation: Pi-hole → Unbound → root servers (DNSSEC verified) |
-| ⬜ | Health check timer: simulate Unbound failure, confirm auto-recovery |
-| ⬜ | Boot ordering: cold reboot, verify Unbound → Pi-hole → Kea sequence |
-| ⬜ | Add-on validation: Chrony NTP |
+| Status | Item | Result |
+|--------|------|--------|
+| ✅ | Test host provisioned (openSUSE Leap 16.0, Podman 5.4.2) | `zeliratest` at `172.16.6.142` |
+| ✅ | Firewall safety: DHCP blocked on LAN via `firewalld` direct rules | 4 persistent rules survived reboot |
+| ✅ | Isolated DHCP test: Kea hands out leases inside podman internal network | Full DISCOVER→OFFER→REQUEST→ACK verified |
+| ✅ | Full `deploy.sh` end-to-end on test host | 15/15 health checks passed; found & fixed 3 bugs (envsubst export, JSON comments, socket perms) |
+| ✅ | DNS validation: Pi-hole → Unbound → root servers (DNSSEC verified) | Recursive resolution, RRSIG records present, `ads.google.com → 0.0.0.0` |
+| ✅ | Health check timer: simulate Unbound failure, confirm auto-recovery | `podman stop unbound` → systemd auto-restarted → DNS restored in <10s |
+| ✅ | Boot ordering: cold reboot, verify Unbound → Pi-hole → Kea sequence | All 3 containers started within 1s of each other, healthy after reboot |
+| ✅ | Add-on validation: Chrony NTP | 7 sources, stratum 4, <1ms offset, LAN access configured |
+
+> Full test log: [testing/results/phase2-validation-2026-04-29.md](../testing/results/phase2-validation-2026-04-29.md)
 
 ---
 

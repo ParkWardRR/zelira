@@ -19,7 +19,9 @@ if [[ ! -f "$ENV_FILE" ]]; then
     exit 1
 fi
 
+set -a  # Export all vars so envsubst can see them
 source "$ENV_FILE"
+set +a
 
 # Validate required vars
 for var in ZELIRA_IP ZELIRA_GATEWAY ZELIRA_SUBNET ZELIRA_POOL_START ZELIRA_POOL_END ZELIRA_DOMAIN ZELIRA_TZ ZELIRA_PIHOLE_PASSWORD ZELIRA_INTERFACE; do
@@ -62,6 +64,7 @@ mkdir -p /srv/unbound
 mkdir -p /srv/kea/etc-kea
 mkdir -p /srv/kea/lib-kea
 mkdir -p /srv/kea/sockets
+chmod 750 /srv/kea/sockets
 echo "  ✓ /srv/{pihole,unbound,kea}"
 
 # ─── Deploy Configs ───────────────────────────────────
@@ -72,8 +75,20 @@ cp "${SCRIPT_DIR}/config/unbound.conf" /srv/unbound/unbound.conf
 echo "  ✓ /srv/unbound/unbound.conf"
 
 # Kea — substitute env vars into template
-envsubst < "${SCRIPT_DIR}/config/kea-dhcp4.conf.template" > /srv/kea/etc-kea/kea-dhcp4.conf
-echo "  ✓ /srv/kea/etc-kea/kea-dhcp4.conf"
+envsubst < "${SCRIPT_DIR}/config/kea-dhcp4.conf.template" > /tmp/kea-dhcp4.conf.tmp
+# Strip JSON comments (// ...) — Kea's parser chokes on them
+sed -i 's|//.*$||' /tmp/kea-dhcp4.conf.tmp
+# Validate JSON syntax before deploying
+if python3 -m json.tool /tmp/kea-dhcp4.conf.tmp > /dev/null 2>&1; then
+    cp /tmp/kea-dhcp4.conf.tmp /srv/kea/etc-kea/kea-dhcp4.conf
+    rm /tmp/kea-dhcp4.conf.tmp
+    echo "  ✓ /srv/kea/etc-kea/kea-dhcp4.conf (JSON valid)"
+else
+    echo "  ✗ Kea config JSON is invalid after templating!"
+    echo "    Check your .env vars — a missing value produces broken JSON."
+    python3 -m json.tool /tmp/kea-dhcp4.conf.tmp 2>&1 | head -5
+    exit 1
+fi
 
 # Pi-hole upstream — point at Unbound
 mkdir -p /srv/pihole/etc-dnsmasq.d
