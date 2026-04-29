@@ -51,7 +51,7 @@ flowchart LR
     D -- "where's youtube.com?" --> PH
     PH -- "is it an ad?" --> UB
     UB -- "ask the source" --> ROOT
-    ROOT -- "142.250.80.46" --> UB
+    ROOT -- "198.51.100.46" --> UB
     UB --> PH
     PH -- "here you go" --> D
     D -- "what time is it?" --> NTP
@@ -364,16 +364,16 @@ sequenceDiagram
     UB->>TLD: Who handles youtube.com?
     TLD-->>UB: Try ns1.google.com
     UB->>AUTH: What's the A record for youtube.com?
-    AUTH-->>UB: 142.250.80.46 (DNSSEC signed ✓)
+    AUTH-->>UB: 198.51.100.46 (DNSSEC signed ✓)
     UB->>UB: Validate DNSSEC signature ✓
-    UB-->>PH: 142.250.80.46 (cached for TTL)
+    UB-->>PH: 198.51.100.46 (cached for TTL)
     PH->>PH: Cache result
-    PH-->>C: 142.250.80.46
+    PH-->>C: 198.51.100.46
 
     Note over C,AUTH: Second lookup for youtube.com:
     C->>PH: Where is youtube.com?
     PH->>PH: Cache hit!
-    PH-->>C: 142.250.80.46 (< 1ms)
+    PH-->>C: 198.51.100.46 (< 1ms)
 ```
 
 ### What Happens to an Ad Request
