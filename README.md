@@ -65,6 +65,48 @@ flowchart LR
 
 All three run as containers on a single Linux box (a Raspberry Pi works great). If the power goes out, Zelira heals itself automatically when it comes back.
 
+### Optional Add-ons
+
+The core stack is DNS + DHCP. But a proper network box should also handle time, dynamic DNS, and a landing page. Zelira includes add-on guides for all three:
+
+```mermaid
+flowchart TD
+    subgraph core["Core Stack (always deployed)"]
+        PH["🛡️ Pi-hole\nDNS + Ad-blocking"]
+        UB["🔒 Unbound\nRecursive DNS"]
+        KEA["📋 Kea\nDHCP Server"]
+        HC["⏱️ Health Check\nAuto-recovery"]
+    end
+
+    subgraph addons["Optional Add-ons"]
+        NTP["🕐 Chrony NTP\nLocal time server\nfor all devices"]
+        DDNS["🌐 Dynamic DNS\nAuto-update your\npublic IP record"]
+        CADDY["🔒 Caddy\nReverse proxy + TLS\nfor landing page"]
+    end
+
+    PH --- UB
+    PH --- HC
+    KEA --- NTP
+    CADDY --- PH
+    DDNS --- CADDY
+
+    style core fill:#1a1a2e,stroke:#4a9eff,stroke-width:2px,color:#fff
+    style addons fill:#1a1a2e,stroke:#22c55e,stroke-width:2px,stroke-dasharray:5 5,color:#fff
+    style PH fill:#96060C,color:#fff
+    style UB fill:#1A5276,color:#fff
+    style KEA fill:#00A98F,color:#fff
+    style HC fill:#333,color:#fff
+    style NTP fill:#1a3547,stroke:#38bdf8,color:#fff
+    style DDNS fill:#1a3547,stroke:#38bdf8,color:#fff
+    style CADDY fill:#1a3547,stroke:#38bdf8,color:#fff
+```
+
+| Add-on | What It Does | Guide |
+|--------|-------------|-------|
+| **NTP (Chrony)** | Local time server — all devices on your network sync clocks from this box instead of the internet | [docs/addon-ntp.md](docs/addon-ntp.md) |
+| **Dynamic DNS** | Auto-updates your public DNS record when your ISP changes your IP (Namecheap, Cloudflare, DuckDNS) | [docs/addon-ddns.md](docs/addon-ddns.md) |
+| **Landing Page (Caddy)** | HTTPS reverse proxy + dashboard — access Pi-hole and a status page at `https://home.yourdomain.com` | [docs/addon-dashboard.md](docs/addon-dashboard.md) |
+
 ---
 
 ## Why This Exists
@@ -160,7 +202,10 @@ zelira/
 │   └── uninstall.sh             # clean removal
 ├── docs/
 │   ├── troubleshooting.md       # common issues + debug chain
-│   └── advanced.md              # DHCP reservations, monitoring, backup
+│   ├── advanced.md              # DHCP reservations, monitoring, backup
+│   ├── addon-ntp.md             # add-on: Chrony NTP time server
+│   ├── addon-ddns.md            # add-on: Dynamic DNS updater
+│   └── addon-dashboard.md       # add-on: Caddy reverse proxy + landing page
 ├── LICENSE.md                   # Blue Oak Model License 1.0.0
 └── README.md
 ```
@@ -611,6 +656,9 @@ Edit `/srv/kea/etc-kea/kea-dhcp4.conf` and add entries to the `reservations` arr
 
 - [Troubleshooting](docs/troubleshooting.md) — common issues, debug chain, log commands
 - [Advanced Configuration](docs/advanced.md) — DHCP reservations, monitoring, backup, DNS-only mode, security hardening
+- [Add-on: NTP Time Server](docs/addon-ntp.md) — Chrony setup, DHCP Option 42, Prometheus metrics
+- [Add-on: Dynamic DNS](docs/addon-ddns.md) — Namecheap, Cloudflare, DuckDNS auto-updaters
+- [Add-on: Landing Page & Reverse Proxy](docs/addon-dashboard.md) — Caddy, auto-TLS, dashboard options
 
 ---
 
