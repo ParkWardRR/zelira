@@ -59,25 +59,25 @@ Every config value and auto-recovery mechanism in this repo exists because somet
 
 ## Forward Roadmap
 
-### Phase 3 — Hardening
+### Phase 3 — Hardening ✅ *(completed 2026-04-29)*
 
-| Priority | Item | Description |
-|----------|------|-------------|
-| 🔴 High | **`deploy.sh` idempotency** | Run twice safely — detect existing state, skip redundant work |
-| 🔴 High | **openSUSE compatibility** | Fix package name differences (`dnsutils` → `bind-utils`, etc.) |
-| 🟡 Medium | **Config validation** | Pre-flight: valid IPs, CIDR math, interface exists, port conflicts |
-| 🟡 Medium | **Kea config validation** | `envsubst` silently produces broken JSON if a var is missing — add JSON syntax check |
-| 🟡 Medium | **systemd-resolved detection** | Auto-detect and disable on Ubuntu/Debian to prevent port 53 conflicts |
+| Status | Item | Result |
+|--------|------|--------|
+| ✅ | **`deploy.sh` idempotency** | Cached image skipping, safe re-runs, existing service detection |
+| ✅ | **openSUSE compatibility** | Multi-distro package detection: apt/zypper/dnf for podman, dig, envsubst |
+| ✅ | **Config validation** | IP/CIDR/interface/port conflict pre-flight checks with clear error messages |
+| ✅ | **Kea config validation** | JSON syntax check via `python3 -m json.tool` after envsubst + comment stripping |
+| ✅ | **systemd-resolved detection** | Auto-detects if resolved is on port 53; prompts user with fix instructions |
 
-### Phase 4 — Add-on Integration
+### Phase 4 — Add-on Integration *(in progress)*
 
-| Priority | Item | Description |
-|----------|------|-------------|
-| 🔴 High | **Add-on deploy scripts** | `deploy-ntp.sh`, `deploy-ddns.sh`, `deploy-dashboard.sh` |
-| 🟡 Medium | **Unified `.env`** | Add-on config in the same `.env` with optional sections |
-| 🟡 Medium | **Health check expansion** | NTP sync, DDNS update age, Caddy cert expiry in `health-check.sh` |
-| 🟡 Medium | **Kea Option 42** | Auto-inject NTP server IP into Kea config if Chrony is deployed |
-| 🟢 Low | **Prometheus metrics** | Export Pi-hole, Unbound, Kea, Chrony metrics for Grafana |
+| Status | Item | Description |
+|--------|------|-------------|
+| ✅ | **Add-on deploy scripts** | `deploy-ntp.sh`, `deploy-ddns.sh`, `deploy-dashboard.sh` — all idempotent |
+| ✅ | **Unified `.env`** | Add-on config (NTP, DDNS, Caddy) in `env.example` with optional sections |
+| ✅ | **Kea Option 42** | `deploy-ntp.sh` auto-injects NTP server IP into Kea config via python3 JSON |
+| 🟡 | **Health check expansion** | NTP sync, DDNS update age, Caddy cert expiry in `health-check.sh` |
+| 🟢 | **Prometheus metrics** | Export Pi-hole, Unbound, Kea, Chrony metrics for Grafana |
 
 ### Phase 5 — Multi-Platform
 
