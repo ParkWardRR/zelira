@@ -210,6 +210,12 @@ func dnsLookup(domain, server string, port int) string {
 	if err != nil || len(addrs) == 0 {
 		return ""
 	}
+	// Prefer IPv4 addresses to match dig's default output
+	for _, addr := range addrs {
+		if net.ParseIP(addr).To4() != nil {
+			return addr
+		}
+	}
 	return addrs[0]
 }
 
