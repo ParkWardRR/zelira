@@ -143,6 +143,19 @@ DHCP request (:67) → Kea DHCPv4 → IP + DNS pointer to Pi-hole
 
 Three Podman containers. Three systemd services. One health check timer. No orchestrator. No YAML framework. Runs on a Raspberry Pi 5 or any Linux box with a static IP.
 
+### How It Compares
+
+| | **Zelira** | Pi-hole (standalone) | AdGuard Home | Technitium |
+|---|---|---|---|---|
+| Recursive DNS (no upstream) | ✅ | ❌ | ❌ | ✅ |
+| Auto-recovery timer | ✅ | ❌ | ❌ | ❌ |
+| Modern DHCP (Kea) | ✅ | ❌ (dnsmasq) | ❌ (basic) | ❌ (basic) |
+| Full DNSSEC validation | ✅ | ❌ | ⚠️ forward-only | ✅ |
+| NTP + DDNS + Dashboard | ✅ (add-ons) | ❌ | ❌ | ❌ |
+| One-command deploy | ✅ | ⚠️ | ✅ | ⚠️ |
+
+> Full breakdown: [Zelira vs. Alternatives](docs/comparison.md)
+
 ### Design Decisions
 
 | Decision | Why |
@@ -760,6 +773,7 @@ Edit `/srv/kea/etc-kea/kea-dhcp4.conf` and add entries to the `reservations` arr
 
 ## Further Reading
 
+- [Zelira vs. Alternatives](docs/comparison.md) — how Zelira compares to Pi-hole, AdGuard Home, and Technitium
 - [Roadmap](docs/ROADMAP.md) — project history, current validation status, forward-looking plans
 - [Migration from Docker Compose](docs/migration-from-docker.md) — step-by-step guide from Pi-hole Docker → Zelira
 - [Troubleshooting](docs/troubleshooting.md) — common issues, debug chain, log commands
