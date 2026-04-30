@@ -104,13 +104,53 @@ The decision to publish came from realizing that every "Pi-hole + Unbound" guide
 
 ## What's Next
 
-### Near-Term
+### Phase 9 — CI/CD \u0026 Release Engineering
 
-| Priority | Item | Description |
-|----------|------|-------------|
-| 🟡 | **CI/CD** | GitHub Actions: ShellCheck, isolated DHCP test |
-| ✅ | ~~**Fedora/RHEL testing**~~ | Validated on AlmaLinux 10.1 (Podman 5.6.0, Go 1.25.9) |
-| 🟡 | **Docker fallback** | Optional Docker-compatible mode for non-Podman hosts |
+Automate quality gates and deliver the CLI as downloadable release binaries.
+
+#### CI Pipeline
+
+| Status | Item | Description |
+|--------|------|-------------|
+| 🔴 | **GitHub Actions: Go build** | Build + unit test on push/PR for `linux/amd64`, `linux/arm64`, `darwin/arm64` |
+| 🔴 | **GitHub Actions: ShellCheck** | Lint remaining bash scripts (deploy-*.sh, health-check.sh) |
+| 🔴 | **Go unit tests** | Table-driven tests for `internal/config` (validation), `internal/checker` (DNS mock), `internal/engine` (unit generation) |
+| 🔴 | **Integration test container** | Podman-in-Podman or rootless test: `zelira validate` \u2192 `zelira deploy` \u2192 `zelira health` in CI |
+| 🟡 | **Multi-distro matrix** | CI runs on Debian 12, AlmaLinux 10, Ubuntu 24.04 via container images |
+
+#### Release Engineering
+
+| Status | Item | Description |
+|--------|------|-------------|
+| 🔴 | **GitHub Releases** | Tag-triggered workflow: build, sign, upload `zelira-linux-amd64` + `zelira-linux-arm64` |
+| 🔴 | **Checksums + signatures** | SHA256 sums + optional GPG signing for release binaries |
+| 🔴 | **Install script** | `curl -sSL https://zelira.dev/install \| sh` \u2014 detect arch, download binary, verify checksum |
+| 🟡 | **Homebrew tap** | `brew install parkwardrr/tap/zelira` for macOS dev machines |
+| 🟡 | **Version bumping** | `make release VERSION=0.3.0` \u2014 tag, build, push |
+
+### Phase 10 — Observability \u0026 Ecosystem
+
+Production monitoring, alternative deployment methods, and Docker compatibility.
+
+#### Observability
+
+| Status | Item | Description |
+|--------|------|-------------|
+| 🔴 | **`zelira metrics serve`** | Long-running HTTP server exposing Prometheus `/metrics` endpoint |
+| 🔴 | **DNS metrics** | Query latency (p50/p95/p99), cache hit ratio, upstream failure count |
+| 🔴 | **DHCP metrics** | Pool utilization (leased/total), lease churn rate, Option 42 propagation |
+| 🔴 | **NTP metrics** | Stratum, offset, jitter, source reachability bitmap |
+| 🟡 | **Grafana dashboard** | Pre-built JSON dashboard for Zelira metrics \u2014 drop-in for existing Grafana instances |
+| 🟡 | **Alerting rules** | Prometheus alerting rules: DNS down \u003e 30s, DHCP pool \u003e 90%, NTP offset \u003e 100ms |
+
+#### Ecosystem
+
+| Status | Item | Description |
+|--------|------|-------------|
+| 🟡 | **Docker fallback** | Optional Docker-compatible mode for non-Podman hosts (`zelira deploy --runtime docker`) |
+| 🟢 | **NixOS module** | Declarative Nix flake: `services.zelira.enable = true;` |
+| 🟢 | **Ansible playbook** | Role-based deployment: `ansible-playbook zelira.yml -i hosts` |
+| 🟢 | **Helm chart** | Kubernetes deployment for lab clusters (not primary target) |
 
 ### Phase 7 — Go CLI ✅
 
@@ -165,14 +205,6 @@ All new commands implemented and tested on AlmaLinux 10.1.
 | ✅ | **`zelira update`** | Force-pull images, restart in dependency order, auto-verify health |
 | ✅ | **`zelira doctor`** | Deep diagnostics: root servers, disk, container age, Unbound cache, TLS, NTP drift |
 | ✅ | **Embedded configs** | `go:embed` for unbound.conf, kea template, healthcheck — true single-file deploy |
-
-### Future
-
-| Priority | Item | Description |
-|----------|------|-------------|
-| 🟢 | **NixOS module** | Declarative deployment |
-| 🟢 | **Ansible playbook** | Config management alternative |
-| 🟢 | **`zelira metrics serve`** | Long-running Prometheus exporter with textfile collectors |
 
 ---
 
