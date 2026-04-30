@@ -112,9 +112,9 @@ The decision to publish came from realizing that every "Pi-hole + Unbound" guide
 | ✅ | ~~**Fedora/RHEL testing**~~ | Validated on AlmaLinux 10.1 (Podman 5.6.0, Go 1.25.9) |
 | 🟡 | **Docker fallback** | Optional Docker-compatible mode for non-Podman hosts |
 
-### Phase 7 — Go CLI *(in progress)*
+### Phase 7 — Go CLI ✅
 
-Single static binary replacing shell scripts. Cross-compiled for arm64 + amd64.
+Single static binary replacing all shell scripts. Cross-compiled for arm64 + amd64.
 
 ```
 zelira deploy              # full stack deploy (idempotent)
@@ -135,37 +135,36 @@ zelira uninstall           # clean removal
 | ✅ | **`zelira health --json`** | Structured JSON with timestamp, per-check status, pass/fail/warn counts |
 | ✅ | **`zelira status`** | Native Go: container + systemd + add-on service detection |
 | ✅ | **`zelira status --json`** | Machine-readable service inventory |
-| ✅ | **Cross-compilation** | `make all` → 6.5 MB (amd64), 6.1 MB (arm64) |
+| ✅ | **Cross-compilation** | `make all` → 6.8 MB (amd64), 6.3 MB (arm64) |
 | ✅ | **AlmaLinux validation** | Built + tested on Go 1.25.9 (dnf); found/fixed 2 bugs |
-| 🟡 | **`zelira deploy`** | Currently wraps deploy.sh — port to native Go |
-| 🟡 | **`zelira addon`** | Currently wraps deploy-*.sh — port to native Go |
-| 🟢 | **GitHub Releases** | Automated binary builds via GitHub Actions |
+| ✅ | **`zelira deploy`** | Native Go: .env parsing, config validation, Podman, systemd unit generation |
+| ✅ | **`zelira addon`** | Native Go: NTP (Chrony + Option 42), DDNS, Dashboard (Caddy) |
+| 🟡 | **GitHub Releases** | Automated binary builds via GitHub Actions |
 
-### Phase 8 — Go CLI Feature Expansion
+### Phase 8 — Go CLI Feature Expansion ✅
 
-Grow the CLI from a wrapper into a full-featured deployment and operations tool.
+All new commands implemented and tested on AlmaLinux 10.1.
 
-#### Native Ports (replace remaining bash)
+#### Native Ports (bash eliminated)
 
 | Status | Item | Description |
 |--------|------|-------------|
-| 🔴 | **`zelira deploy` (native)** | Port deploy.sh to Go: .env parsing, config validation, Podman API, systemd unit generation |
-| 🔴 | **`zelira addon` (native)** | Port deploy-ntp/ddns/dashboard to Go: package detection, config templating, service management |
-| 🔴 | **`zelira uninstall` (native)** | Port uninstall.sh: stop containers, remove units, optional data purge |
+| ✅ | **`zelira deploy` (native)** | .env parsing, config validation, Podman API, systemd unit generation, embedded configs |
+| ✅ | **`zelira addon` (native)** | NTP: Chrony + Kea Option 42 injection. DDNS: config validation. Dashboard: Caddy install |
+| ✅ | **`zelira uninstall` (native)** | Stop, disable, remove containers + units. `--purge` flag for data cleanup |
 
 #### New Features
 
 | Status | Item | Description |
 |--------|------|-------------|
-| 🔴 | **`zelira validate`** | Pre-flight config checker: .env syntax, IP/CIDR math, interface existence, port conflicts — without deploying |
-| 🔴 | **`zelira init`** | Interactive wizard: detect interfaces, suggest IPs/pools, generate `.env` from answers |
-| 🔴 | **`zelira logs`** | Unified log viewer: stream Pi-hole, Unbound, Kea, and health check logs with filtering |
-| 🔴 | **`zelira backup`** | Export Pi-hole gravity, Kea leases, Unbound cache, .env, and systemd units to a tarball |
-| 🔴 | **`zelira restore`** | Restore from backup tarball — idempotent, validates before applying |
-| 🟡 | **`zelira update`** | Pull latest images, restart in dependency order, verify health — replaces manual update steps |
-| 🟡 | **`zelira metrics`** | Expose Prometheus-compatible `/metrics` endpoint: DNS latency, cache hit ratio, DHCP pool usage, NTP offset |
-| 🟢 | **`zelira doctor`** | Deep diagnostic: test upstream connectivity, check disk space, validate TLS certs, detect stale Unbound cache |
-| 🟢 | **Embedded configs** | Embed `unbound.conf`, `kea-dhcp4.conf.template`, systemd units into the binary via `go:embed` — single-file deploy |
+| ✅ | **`zelira validate`** | Pre-flight: .env, IPs, CIDR, interface, ports, systemd-resolved, dependencies — 13 checks |
+| ✅ | **`zelira init`** | Interactive wizard: detect interfaces, suggest IPs/pools, generate `.env` |
+| ✅ | **`zelira logs`** | Unified journalctl viewer: `-s pihole`, `-n 200`, `-f` (follow) |
+| ✅ | **`zelira backup`** | tar.gz export: /srv/ data, systemd units, .env (34 files, 2.9 MB on test host) |
+| ✅ | **`zelira restore`** | tar.gz import with idempotent extraction |
+| ✅ | **`zelira update`** | Force-pull images, restart in dependency order, auto-verify health |
+| ✅ | **`zelira doctor`** | Deep diagnostics: root servers, disk, container age, Unbound cache, TLS, NTP drift |
+| ✅ | **Embedded configs** | `go:embed` for unbound.conf, kea template, healthcheck — true single-file deploy |
 
 ### Future
 
