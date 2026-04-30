@@ -141,13 +141,39 @@ zelira uninstall           # clean removal
 | 🟡 | **`zelira addon`** | Currently wraps deploy-*.sh — port to native Go |
 | 🟢 | **GitHub Releases** | Automated binary builds via GitHub Actions |
 
+### Phase 8 — Go CLI Feature Expansion
+
+Grow the CLI from a wrapper into a full-featured deployment and operations tool.
+
+#### Native Ports (replace remaining bash)
+
+| Status | Item | Description |
+|--------|------|-------------|
+| 🔴 | **`zelira deploy` (native)** | Port deploy.sh to Go: .env parsing, config validation, Podman API, systemd unit generation |
+| 🔴 | **`zelira addon` (native)** | Port deploy-ntp/ddns/dashboard to Go: package detection, config templating, service management |
+| 🔴 | **`zelira uninstall` (native)** | Port uninstall.sh: stop containers, remove units, optional data purge |
+
+#### New Features
+
+| Status | Item | Description |
+|--------|------|-------------|
+| 🔴 | **`zelira validate`** | Pre-flight config checker: .env syntax, IP/CIDR math, interface existence, port conflicts — without deploying |
+| 🔴 | **`zelira init`** | Interactive wizard: detect interfaces, suggest IPs/pools, generate `.env` from answers |
+| 🔴 | **`zelira logs`** | Unified log viewer: stream Pi-hole, Unbound, Kea, and health check logs with filtering |
+| 🔴 | **`zelira backup`** | Export Pi-hole gravity, Kea leases, Unbound cache, .env, and systemd units to a tarball |
+| 🔴 | **`zelira restore`** | Restore from backup tarball — idempotent, validates before applying |
+| 🟡 | **`zelira update`** | Pull latest images, restart in dependency order, verify health — replaces manual update steps |
+| 🟡 | **`zelira metrics`** | Expose Prometheus-compatible `/metrics` endpoint: DNS latency, cache hit ratio, DHCP pool usage, NTP offset |
+| 🟢 | **`zelira doctor`** | Deep diagnostic: test upstream connectivity, check disk space, validate TLS certs, detect stale Unbound cache |
+| 🟢 | **Embedded configs** | Embed `unbound.conf`, `kea-dhcp4.conf.template`, systemd units into the binary via `go:embed` — single-file deploy |
+
 ### Future
 
 | Priority | Item | Description |
 |----------|------|-------------|
 | 🟢 | **NixOS module** | Declarative deployment |
 | 🟢 | **Ansible playbook** | Config management alternative |
-| 🟢 | **`deploy-metrics.sh`** | One-command Prometheus exporter setup |
+| 🟢 | **`zelira metrics serve`** | Long-running Prometheus exporter with textfile collectors |
 
 ---
 
