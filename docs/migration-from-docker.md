@@ -88,12 +88,12 @@ sudo rm /etc/resolv.conf
 echo "nameserver 1.1.1.1" | sudo tee /etc/resolv.conf
 ```
 
-> Zelira's deploy.sh detects this automatically and will prompt you.
+> `zelira deploy` detects this automatically and will prompt you.
 
 ### 6. Deploy
 
 ```bash
-sudo ./deploy.sh
+sudo ./zelira deploy
 ```
 
 ### 7. Restore Custom DNS Records
@@ -143,10 +143,10 @@ sudo systemctl restart container-kea-dhcp4
 ### 10. Verify
 
 ```bash
-./scripts/health-check.sh
+./zelira health
 ```
 
-Expected: 15/15 passed, HEALTHY.
+Expected: 19/19 passed, HEALTHY.
 
 ### 11. Update Your Router
 
@@ -166,7 +166,7 @@ sudo apt remove docker.io docker-compose  # Remove Docker
 | Issue | Cause | Fix |
 |-------|-------|-----|
 | Port 53 already in use | systemd-resolved | `sudo systemctl disable --now systemd-resolved` |
-| Pi-hole can't reach Unbound | Containers started in wrong order | deploy.sh handles this with `Requires=` + sleep |
+| Pi-hole can't reach Unbound | Containers started in wrong order | `zelira deploy` handles this with `Requires=` + sleep |
 | DHCP leases not renewing | Clients still have old lease from router DHCP | Wait for lease expiry, or `ipconfig /release` on clients |
 | Blocklists empty | Pi-hole v6 stores lists in DB, not files | Re-add via web UI, then `pihole -g` |
 | Custom DNS not working | `custom.list` not copied | Copy from backup to `/srv/pihole/etc-pihole/` |
@@ -203,5 +203,5 @@ services:
 ```bash
 # AFTER: Zelira
 # One command. All config from .env.
-sudo ./deploy.sh
+sudo ./zelira deploy
 ```

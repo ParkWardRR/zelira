@@ -70,7 +70,7 @@ The decision to publish came from realizing that every "Pi-hole + Unbound" guide
 
 | Item | Result |
 |------|--------|
-| Add-on deploy scripts | `deploy-ntp.sh`, `deploy-ddns.sh`, `deploy-dashboard.sh` |
+| Add-on deployment | `zelira addon ntp`, `zelira addon ddns`, `zelira addon dashboard` |
 | Unified `.env` | Add-on config in `env.example` with optional sections |
 | Kea Option 42 | NTP server IP auto-injected into Kea config |
 | Health check expansion | NTP, DDNS, Caddy checks added |
@@ -151,7 +151,6 @@ Automate quality gates and deliver the CLI as downloadable release binaries.
 | Status | Item | Description |
 |--------|------|-------------|
 | 🔴 | **GitHub Actions: Go build** | Build + unit test on push/PR for `linux/amd64`, `linux/arm64`, `darwin/arm64` |
-| 🔴 | **GitHub Actions: ShellCheck** | Lint remaining bash scripts (deploy-*.sh, health-check.sh) |
 | 🔴 | **Go unit tests** | Table-driven tests for `internal/config`, `internal/checker`, `internal/engine` |
 | 🔴 | **Integration test container** | Podman-in-Podman or rootless: `zelira validate` → `zelira deploy` → `zelira health` in CI |
 | 🟡 | **Multi-distro matrix** | CI runs on Debian 12, AlmaLinux 10, Ubuntu 24.04 via container images |

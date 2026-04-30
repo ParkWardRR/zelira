@@ -172,8 +172,6 @@ Three Podman containers. Three systemd services. One Go binary. No orchestrator.
 
 ## Quick Start
 
-### Option A: Go CLI (recommended)
-
 A single 6.8 MB binary — no bash, no Python, no envsubst needed at runtime.
 
 ```bash
@@ -199,17 +197,6 @@ sudo ./zelira addon ddns              # Dynamic DNS updater
 sudo ./zelira addon dashboard         # Caddy reverse proxy + TLS
 ```
 
-### Option B: Shell scripts (legacy)
-
-```bash
-git clone https://github.com/ParkWardRR/zelira.git && cd zelira
-cp config/env.example config/.env && vi config/.env
-sudo ./deploy.sh
-./scripts/health-check.sh
-```
-
-### After deploying
-
 Then either:
 - Point your router's DHCP to hand out this host's IP as the DNS server, **or**
 - Disable your router's DHCP entirely and let Kea handle it
@@ -226,9 +213,7 @@ Then either:
 | Podman | 4.0+ | `apt install podman` / `zypper install podman` / `dnf install podman` | Container runtime |
 | Static IP | — | Configure before deploying | This box IS your DNS/DHCP server |
 
-**If using the Go CLI binary** (recommended), that's all you need — `dig`, `envsubst`, and `python3` are no longer required at runtime. The binary embeds all configs and performs validation natively.
-
-**If using shell scripts** (legacy), you also need: `dig` (`dnsutils` / `bind-utils`), `envsubst` (`gettext-base` / `gettext-runtime`), and optionally `python3` for Kea JSON validation.
+That's it. The Go CLI binary embeds all configs and performs validation natively — no `dig`, `envsubst`, or `python3` required.
 
 ### Tested Platforms
 
@@ -252,7 +237,7 @@ zelira/
 │   ├── main.go
 │   └── commands/                     # cobra subcommands
 │       ├── root.go                   # global flags, version, findFile
-│       ├── deploy.go                 # native deploy (replaces deploy.sh)
+│       ├── deploy.go                 # full stack deployment
 │       ├── health.go                 # health check engine
 │       ├── status.go                 # container + systemd status
 │       ├── addon.go                  # native add-on installer
@@ -276,8 +261,7 @@ zelira/
 │       ├── apartment.env             # simple /24, 10-20 devices
 │       ├── house.env                 # /23, DDNS, dashboard
 │       └── homelab.env               # /16 with VLANs, TLS, full add-ons
-├── deploy.sh                         # legacy shell deploy (still works)
-├── scripts/                          # legacy shell scripts
+├── scripts/dns-healthcheck.sh        # deployed to host by CLI
 ├── systemd/                          # timer + oneshot units
 ├── testing/results/                  # validation test logs
 ├── docs/                             # guides, roadmap, comparisons
@@ -741,31 +725,15 @@ After=container-unbound.service
 Requires=container-unbound.service
 ```
 
-And `deploy.sh` adds a 3-second sleep between starting Unbound and Pi-hole to let Unbound fully initialize.
+And `zelira deploy` adds a 3-second sleep between starting Unbound and Pi-hole to let Unbound fully initialize.
 
 ---
 
 ## Updating
 
 ```bash
-# Re-run deploy with fresh images (idempotent — safe to run anytime)
-sudo ./deploy.sh --force-pull
-
-# Verify
-./scripts/health-check.sh
-```
-
-Or update manually:
-
-```bash
-sudo podman pull docker.io/pihole/pihole:latest
-sudo podman pull docker.io/klutchell/unbound:latest
-sudo podman pull docker.io/jonasal/kea-dhcp4:2.6
-
-# Restart in dependency order (Unbound first, then Pi-hole)
-sudo systemctl restart container-unbound
-sleep 3
-sudo systemctl restart container-pihole container-kea-dhcp4
+# Pull latest images, restart in dependency order, verify health
+sudo zelira update
 ```
 
 ---
@@ -773,12 +741,9 @@ sudo systemctl restart container-pihole container-kea-dhcp4
 ## Uninstalling
 
 ```bash
-sudo ./scripts/uninstall.sh
+sudo zelira uninstall            # stops services, removes units — data preserved
+sudo zelira uninstall --purge    # also deletes /srv/pihole, /srv/unbound, /srv/kea
 ```
-
-Stops containers, removes systemd services and the health check script. **Config data in `/srv/` is preserved** for re-deployment.
-
-Full purge: `sudo rm -rf /srv/pihole /srv/unbound /srv/kea`
 
 ---
 

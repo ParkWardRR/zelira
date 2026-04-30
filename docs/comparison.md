@@ -22,7 +22,7 @@ Zelira isn't trying to be everything. It's an opinionated deployment kit that pr
 | **Container Runtime** | Podman + systemd (no daemon) | Docker or bare metal | Single binary / Docker | .NET binary / Docker |
 | **Config Format** | `.env` → envsubst → JSON | Web UI + flat files | YAML + Web UI | Web UI + JSON API |
 | **Clustering / HA** | Not supported (single-box) | Manual (Gravity Sync) | Manual | Native multi-node sync |
-| **Setup Effort** | `sudo ./deploy.sh` | Install script + manual Unbound | Single binary, wizard UI | Install + web UI config |
+| **Setup Effort** | `sudo zelira deploy` | Install script + manual Unbound | Single binary, wizard UI | Install + web UI config |
 
 ---
 
@@ -43,7 +43,7 @@ Pi-hole is the most popular DNS ad-blocker, and Zelira is built *on top of* Pi-h
 | **Boot Ordering** | Unbound and Pi-hole start whenever | systemd `Requires` + `After` + 3s init delay |
 | **Config Management** | Scattered across web UI, files, TOML | Single `.env` file → automated templating |
 | **NTP** | Not included | Chrony add-on with auto DHCP Option 42 injection |
-| **Deployment** | Manual multi-step install | `sudo ./deploy.sh` (one command, idempotent) |
+| **Deployment** | Manual multi-step install | `sudo zelira deploy` (one command, idempotent) |
 
 **Bottom line:** If you're running Pi-hole + Unbound manually with Docker Compose, you're solving the same problems Zelira already solved — just without the auto-recovery, boot ordering, and Kea DHCP.
 
@@ -53,7 +53,7 @@ AdGuard Home is a polished all-in-one DNS solution. It's excellent for "set and 
 
 | Concern | AdGuard Home | Zelira |
 |---------|-------------|--------|
-| **Setup** | Single binary, web wizard — very easy | `deploy.sh` — slightly more config, but still one command |
+| **Setup** | Single binary, web wizard — very easy | `zelira init` + `zelira deploy` — slightly more config, but still two commands |
 | **DNS Resolution** | Forwards to upstream (Cloudflare, Google, etc.) | Recursive from root servers (no upstream dependency) |
 | **Encrypted DNS** | Native DoH/DoT/DoQ | Not needed — Zelira talks to root servers directly |
 | **Parental Controls** | Built-in per-client rules, safe search | Not included (use Pi-hole groups + custom blocklists) |
