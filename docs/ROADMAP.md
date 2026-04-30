@@ -7,7 +7,7 @@
 ## Design Principles
 
 1. **Every config value has a reason.** If a value is set, there's a production incident behind it.
-2. **One command to deploy, one command to verify.** `sudo ./deploy.sh` and `./scripts/health-check.sh`.
+2. **One command to deploy, one command to verify.** `sudo zelira deploy` and `zelira health`.
 3. **No external dependencies at runtime.** DNS from root servers. DHCP is local. NTP from pool.ntp.org.
 4. **Survive power outages gracefully.** Stale cache, auto-recovery timers, correct boot ordering.
 5. **Podman + systemd, not Docker + Compose.** Fewer moving parts, no daemon.
@@ -92,6 +92,14 @@ The decision to publish came from realizing that every "Pi-hole + Unbound" guide
 | Example configs | `config/examples/` — apartment, house, homelab-with-VLANs |
 | Migration guide | [migration-from-docker.md](migration-from-docker.md) — Docker Compose → Zelira |
 
+### Phase 6 — Documentation ✅
+
+| Item | Result |
+|------|--------|
+| Zelira vs. Alternatives | [comparison.md](comparison.md) — vs Pi-hole, AdGuard Home, Technitium (feature matrix, trade-offs) |
+| README overhaul | Updated architecture tree, health check output (19→21 checks), Quick Start with example configs + add-on commands |
+| Testing docs | Validation logs for openSUSE Leap 16, AlmaLinux 10.1 |
+
 ---
 
 ## What's Next
@@ -101,12 +109,12 @@ The decision to publish came from realizing that every "Pi-hole + Unbound" guide
 | Priority | Item | Description |
 |----------|------|-------------|
 | 🟡 | **CI/CD** | GitHub Actions: ShellCheck, isolated DHCP test |
-| 🟡 | **Fedora/RHEL testing** | Validate on Fedora 40+, AlmaLinux 9 |
+| ✅ | ~~**Fedora/RHEL testing**~~ | Validated on AlmaLinux 10.1 (Podman 5.6.0, Go 1.25.9) |
 | 🟡 | **Docker fallback** | Optional Docker-compatible mode for non-Podman hosts |
 
 ### Phase 7 — Go CLI *(in progress)*
 
-Replace shell scripts with a single static binary. Cross-compiled for arm64 + amd64.
+Single static binary replacing shell scripts. Cross-compiled for arm64 + amd64.
 
 ```
 zelira deploy              # full stack deploy (idempotent)
@@ -122,12 +130,15 @@ zelira uninstall           # clean removal
 
 | Status | Item | Description |
 |--------|------|-------------|
-| ✅ | **CLI scaffold** | cobra-based subcommands, root flags |
-| 🔴 | **`zelira health`** | Port health-check.sh logic to native Go (DNS, NTP, ports, certs) |
-| 🔴 | **`zelira deploy`** | Port deploy.sh config validation + orchestration |
-| 🔴 | **`zelira addon`** | Port add-on deploy scripts |
-| 🟡 | **`--json` output** | Structured JSON for all commands |
-| 🟡 | **Cross-compilation** | `GOOS=linux GOARCH=arm64` + `amd64` release binaries |
+| ✅ | **CLI scaffold** | cobra-based subcommands, `--json` global flag, version |
+| ✅ | **`zelira health`** | Native Go: DNS via net.Resolver, port checks, NTP parsing, TLS cert inspection |
+| ✅ | **`zelira health --json`** | Structured JSON with timestamp, per-check status, pass/fail/warn counts |
+| ✅ | **`zelira status`** | Native Go: container + systemd + add-on service detection |
+| ✅ | **`zelira status --json`** | Machine-readable service inventory |
+| ✅ | **Cross-compilation** | `make all` → 6.5 MB (amd64), 6.1 MB (arm64) |
+| ✅ | **AlmaLinux validation** | Built + tested on Go 1.25.9 (dnf); found/fixed 2 bugs |
+| 🟡 | **`zelira deploy`** | Currently wraps deploy.sh — port to native Go |
+| 🟡 | **`zelira addon`** | Currently wraps deploy-*.sh — port to native Go |
 | 🟢 | **GitHub Releases** | Automated binary builds via GitHub Actions |
 
 ### Future
