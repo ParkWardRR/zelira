@@ -11,7 +11,8 @@
 3. **No external dependencies at runtime.** DNS from root servers. DHCP is local. NTP from pool.ntp.org.
 4. **Survive power outages gracefully.** Stale cache, auto-recovery timers, correct boot ordering.
 5. **Podman + systemd, not Docker + Compose.** Fewer moving parts, no daemon.
-6. **Document the failures, not just the successes.**
+6. **Single binary, zero bash at runtime.** The Go CLI embeds all configs and replaces all shell scripts.
+7. **Document the failures, not just the successes.**
 
 ---
 
@@ -23,11 +24,11 @@ The decision to publish came from realizing that every "Pi-hole + Unbound" guide
 
 ---
 
-## What's Been Done
+## Completed
 
-### Phase 0 — Production Hardening
+### Phase 1 — Foundation
 
-*Running on a real network for months before Zelira existed as a project.*
+*Production hardening + first public release.*
 
 | Event | Impact |
 |-------|--------|
@@ -38,17 +39,8 @@ The decision to publish came from realizing that every "Pi-hole + Unbound" guide
 | **Incident:** Pi-hole FTL TCP connection storms (105/hr) | Fixed with `tcp-idle-timeout: 120000` + `incoming-num-tcp: 20` |
 | **Incident:** Pi-hole v6 dual DNS source conflict | Documented as Pitfall #3 |
 | DHCP Snooping dropped Kea packets on managed switch | Documented as Pitfall #4 |
-| Kea exporter crash loop (missing control socket) | Fixed in default Kea template |
-| Added Caddy, Dynamic DNS, Chrony NTP | Full stack for production homelab |
-
-### Phase 1 — Public Release
-
-| Date | Commit | Milestone |
-|------|--------|-----------|
-| 2026-04-29 | `fbd6f98` | Initial release: core stack, deploy script, health check, uninstall |
-| 2026-04-29 | `2eb4429` | Mermaid diagrams: DNS flow, ad-blocking, auto-recovery, boot chain |
-| 2026-04-29 | `490b8c7` | Add-on docs: NTP (Chrony), Dynamic DNS, Landing Page (Caddy) |
-| 2026-04-29 | `6be7d5d` | Testing framework: isolated DHCP test, firewall safety |
+| Initial public release | Core stack, deploy script, health check, uninstall |
+| Mermaid diagrams | DNS flow, ad-blocking, auto-recovery, boot chain |
 
 ### Phase 2 — Validation ✅
 
@@ -74,95 +66,41 @@ The decision to publish came from realizing that every "Pi-hole + Unbound" guide
 | Kea JSON validation | `python3 -m json.tool` after envsubst + comment stripping |
 | systemd-resolved detection | Auto-detects port 53 conflict; prompts user with fix |
 
-### Phase 4 — Add-on Integration ✅
+### Phase 4 — Add-ons ✅
 
 | Item | Result |
 |------|--------|
-| Add-on deploy scripts | `deploy-ntp.sh`, `deploy-ddns.sh`, `deploy-dashboard.sh` — all idempotent |
+| Add-on deploy scripts | `deploy-ntp.sh`, `deploy-ddns.sh`, `deploy-dashboard.sh` |
 | Unified `.env` | Add-on config in `env.example` with optional sections |
-| Kea Option 42 | `deploy-ntp.sh` auto-injects NTP server IP into Kea config |
-| Health check expansion | NTP (stratum, offset, sources), DDNS (container, logs), Caddy (TLS expiry, HTTP) |
+| Kea Option 42 | NTP server IP auto-injected into Kea config |
+| Health check expansion | NTP, DDNS, Caddy checks added |
 | Metrics framework | Documented in [addon-metrics.md](addon-metrics.md) |
 
 ### Phase 5 — Community ✅
 
 | Item | Result |
 |------|--------|
-| Contributing guide | [CONTRIBUTING.md](../CONTRIBUTING.md) — ground rules, code style, PR process |
-| Example configs | `config/examples/` — apartment, house, homelab-with-VLANs |
-| Migration guide | [migration-from-docker.md](migration-from-docker.md) — Docker Compose → Zelira |
+| Contributing guide | [CONTRIBUTING.md](../CONTRIBUTING.md) |
+| Example configs | `config/examples/` — apartment, house, homelab |
+| Migration guide | [migration-from-docker.md](migration-from-docker.md) |
 
 ### Phase 6 — Documentation ✅
 
 | Item | Result |
 |------|--------|
-| Zelira vs. Alternatives | [comparison.md](comparison.md) — vs Pi-hole, AdGuard Home, Technitium (feature matrix, trade-offs) |
-| README overhaul | Updated architecture tree, health check output (19→21 checks), Quick Start with example configs + add-on commands |
-| Testing docs | Validation logs for openSUSE Leap 16, AlmaLinux 10.1 |
-
----
-
-## What's Next
-
-### Phase 9 — CI/CD \u0026 Release Engineering
-
-Automate quality gates and deliver the CLI as downloadable release binaries.
-
-#### CI Pipeline
-
-| Status | Item | Description |
-|--------|------|-------------|
-| 🔴 | **GitHub Actions: Go build** | Build + unit test on push/PR for `linux/amd64`, `linux/arm64`, `darwin/arm64` |
-| 🔴 | **GitHub Actions: ShellCheck** | Lint remaining bash scripts (deploy-*.sh, health-check.sh) |
-| 🔴 | **Go unit tests** | Table-driven tests for `internal/config` (validation), `internal/checker` (DNS mock), `internal/engine` (unit generation) |
-| 🔴 | **Integration test container** | Podman-in-Podman or rootless test: `zelira validate` \u2192 `zelira deploy` \u2192 `zelira health` in CI |
-| 🟡 | **Multi-distro matrix** | CI runs on Debian 12, AlmaLinux 10, Ubuntu 24.04 via container images |
-
-#### Release Engineering
-
-| Status | Item | Description |
-|--------|------|-------------|
-| 🔴 | **GitHub Releases** | Tag-triggered workflow: build, sign, upload `zelira-linux-amd64` + `zelira-linux-arm64` |
-| 🔴 | **Checksums + signatures** | SHA256 sums + optional GPG signing for release binaries |
-| 🔴 | **Install script** | `curl -sSL https://zelira.dev/install \| sh` \u2014 detect arch, download binary, verify checksum |
-| 🟡 | **Homebrew tap** | `brew install parkwardrr/tap/zelira` for macOS dev machines |
-| 🟡 | **Version bumping** | `make release VERSION=0.3.0` \u2014 tag, build, push |
-
-### Phase 10 — Observability \u0026 Ecosystem
-
-Production monitoring, alternative deployment methods, and Docker compatibility.
-
-#### Observability
-
-| Status | Item | Description |
-|--------|------|-------------|
-| 🔴 | **`zelira metrics serve`** | Long-running HTTP server exposing Prometheus `/metrics` endpoint |
-| 🔴 | **DNS metrics** | Query latency (p50/p95/p99), cache hit ratio, upstream failure count |
-| 🔴 | **DHCP metrics** | Pool utilization (leased/total), lease churn rate, Option 42 propagation |
-| 🔴 | **NTP metrics** | Stratum, offset, jitter, source reachability bitmap |
-| 🟡 | **Grafana dashboard** | Pre-built JSON dashboard for Zelira metrics \u2014 drop-in for existing Grafana instances |
-| 🟡 | **Alerting rules** | Prometheus alerting rules: DNS down \u003e 30s, DHCP pool \u003e 90%, NTP offset \u003e 100ms |
-
-#### Ecosystem
-
-| Status | Item | Description |
-|--------|------|-------------|
-| 🟡 | **Docker fallback** | Optional Docker-compatible mode for non-Podman hosts (`zelira deploy --runtime docker`) |
-| 🟢 | **NixOS module** | Declarative Nix flake: `services.zelira.enable = true;` |
-| 🟢 | **Ansible playbook** | Role-based deployment: `ansible-playbook zelira.yml -i hosts` |
-| 🟢 | **Helm chart** | Kubernetes deployment for lab clusters (not primary target) |
+| Zelira vs. Alternatives | [comparison.md](comparison.md) |
+| README overhaul | Architecture diagrams, health output, Quick Start |
+| Testing docs | Validation logs for openSUSE 16 + AlmaLinux 10.1 |
 
 ### Phase 7 — Go CLI ✅
 
-Single static binary replacing all shell scripts. Cross-compiled for arm64 + amd64.
+*Single static binary replacing all shell scripts. Cross-compiled for arm64 + amd64.*
 
 ```
 zelira deploy              # full stack deploy (idempotent)
 zelira health              # run all health checks
 zelira health --json       # structured output for monitoring
 zelira addon ntp           # deploy Chrony NTP add-on
-zelira addon ddns          # deploy Dynamic DNS add-on
-zelira addon dashboard     # deploy Caddy dashboard add-on
 zelira status              # container + service status
 zelira status --json       # machine-readable for Prometheus/scripts
 zelira uninstall           # clean removal
@@ -175,28 +113,20 @@ zelira uninstall           # clean removal
 | ✅ | **`zelira health --json`** | Structured JSON with timestamp, per-check status, pass/fail/warn counts |
 | ✅ | **`zelira status`** | Native Go: container + systemd + add-on service detection |
 | ✅ | **`zelira status --json`** | Machine-readable service inventory |
-| ✅ | **Cross-compilation** | `make all` → 6.8 MB (amd64), 6.3 MB (arm64) |
-| ✅ | **AlmaLinux validation** | Built + tested on Go 1.25.9 (dnf); found/fixed 2 bugs |
 | ✅ | **`zelira deploy`** | Native Go: .env parsing, config validation, Podman, systemd unit generation |
 | ✅ | **`zelira addon`** | Native Go: NTP (Chrony + Option 42), DDNS, Dashboard (Caddy) |
-| 🟡 | **GitHub Releases** | Automated binary builds via GitHub Actions |
+| ✅ | **Cross-compilation** | `make all` → 6.8 MB (amd64), 6.3 MB (arm64) |
+| ✅ | **AlmaLinux validation** | Built + tested on Go 1.25.9 (dnf); found/fixed 2 bugs |
 
-### Phase 8 — Go CLI Feature Expansion ✅
+### Phase 8 — Feature Expansion ✅
 
-All new commands implemented and tested on AlmaLinux 10.1.
-
-#### Native Ports (bash eliminated)
+*All new commands implemented and tested on AlmaLinux 10.1.*
 
 | Status | Item | Description |
 |--------|------|-------------|
 | ✅ | **`zelira deploy` (native)** | .env parsing, config validation, Podman API, systemd unit generation, embedded configs |
 | ✅ | **`zelira addon` (native)** | NTP: Chrony + Kea Option 42 injection. DDNS: config validation. Dashboard: Caddy install |
 | ✅ | **`zelira uninstall` (native)** | Stop, disable, remove containers + units. `--purge` flag for data cleanup |
-
-#### New Features
-
-| Status | Item | Description |
-|--------|------|-------------|
 | ✅ | **`zelira validate`** | Pre-flight: .env, IPs, CIDR, interface, ports, systemd-resolved, dependencies — 13 checks |
 | ✅ | **`zelira init`** | Interactive wizard: detect interfaces, suggest IPs/pools, generate `.env` |
 | ✅ | **`zelira logs`** | Unified journalctl viewer: `-s pihole`, `-n 200`, `-f` (follow) |
@@ -205,6 +135,60 @@ All new commands implemented and tested on AlmaLinux 10.1.
 | ✅ | **`zelira update`** | Force-pull images, restart in dependency order, auto-verify health |
 | ✅ | **`zelira doctor`** | Deep diagnostics: root servers, disk, container age, Unbound cache, TLS, NTP drift |
 | ✅ | **Embedded configs** | `go:embed` for unbound.conf, kea template, healthcheck — true single-file deploy |
+
+> Full validation log: [testing/results/go-cli-v0.2.0-validation-2026-04-30.md](../testing/results/go-cli-v0.2.0-validation-2026-04-30.md)
+
+---
+
+## What's Next
+
+### Phase 9 — CI/CD & Release Engineering
+
+Automate quality gates and deliver the CLI as downloadable release binaries.
+
+#### CI Pipeline
+
+| Status | Item | Description |
+|--------|------|-------------|
+| 🔴 | **GitHub Actions: Go build** | Build + unit test on push/PR for `linux/amd64`, `linux/arm64`, `darwin/arm64` |
+| 🔴 | **GitHub Actions: ShellCheck** | Lint remaining bash scripts (deploy-*.sh, health-check.sh) |
+| 🔴 | **Go unit tests** | Table-driven tests for `internal/config`, `internal/checker`, `internal/engine` |
+| 🔴 | **Integration test container** | Podman-in-Podman or rootless: `zelira validate` → `zelira deploy` → `zelira health` in CI |
+| 🟡 | **Multi-distro matrix** | CI runs on Debian 12, AlmaLinux 10, Ubuntu 24.04 via container images |
+
+#### Release Engineering
+
+| Status | Item | Description |
+|--------|------|-------------|
+| 🔴 | **GitHub Releases** | Tag-triggered workflow: build, sign, upload `zelira-linux-amd64` + `zelira-linux-arm64` |
+| 🔴 | **Checksums + signatures** | SHA256 sums + optional GPG signing for release binaries |
+| 🔴 | **Install script** | `curl -sSL https://zelira.dev/install \| sh` — detect arch, download binary, verify checksum |
+| 🟡 | **Homebrew tap** | `brew install parkwardrr/tap/zelira` for macOS dev machines |
+| 🟡 | **Version bumping** | `make release VERSION=0.3.0` — tag, build, push |
+
+### Phase 10 — Observability & Ecosystem
+
+Production monitoring, alternative deployment methods, and Docker compatibility.
+
+#### Observability
+
+| Status | Item | Description |
+|--------|------|-------------|
+| 🔴 | **`zelira metrics serve`** | Long-running HTTP server exposing Prometheus `/metrics` endpoint |
+| 🔴 | **DNS metrics** | Query latency (p50/p95/p99), cache hit ratio, upstream failure count |
+| 🔴 | **DHCP metrics** | Pool utilization (leased/total), lease churn rate, Option 42 propagation |
+| 🔴 | **NTP metrics** | Stratum, offset, jitter, source reachability bitmap |
+| 🟡 | **Grafana dashboard** | Pre-built JSON dashboard for Zelira metrics — drop-in for existing Grafana instances |
+| 🟡 | **Alerting rules** | Prometheus alerting rules: DNS down >30s, DHCP pool >90%, NTP offset >100ms |
+
+#### Ecosystem
+
+| Status | Item | Description |
+|--------|------|-------------|
+| 🟡 | **Docker fallback** | Optional Docker-compatible mode (`zelira deploy --runtime docker`) |
+| 🟢 | **NixOS module** | Declarative Nix flake: `services.zelira.enable = true;` |
+| 🟢 | **Ansible playbook** | Role-based deployment: `ansible-playbook zelira.yml -i hosts` |
+| 🟢 | **Helm chart** | Kubernetes deployment for lab clusters (not primary target) |
 
 ---
 

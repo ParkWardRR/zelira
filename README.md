@@ -2,7 +2,7 @@
   <h1 align="center">Zelira</h1>
   <p align="center">
     Production-hardened DNS + DHCP for homelabs.<br/>
-    Pi-hole · Unbound · Kea · NTP · DDNS · Dashboard — one command.
+    Pi-hole · Unbound · Kea · NTP · DDNS · Dashboard — one binary.
   </p>
 </p>
 
@@ -141,7 +141,7 @@ DNS query (:53) → Pi-hole (ad-blocking) → Unbound (:5335, recursive, DNSSEC)
 DHCP request (:67) → Kea DHCPv4 → IP + DNS pointer to Pi-hole
 ```
 
-Three Podman containers. Three systemd services. One health check timer. No orchestrator. No YAML framework. Runs on a Raspberry Pi 5 or any Linux box with a static IP.
+Three Podman containers. Three systemd services. One Go binary. No orchestrator. No YAML framework. Runs on a Raspberry Pi 5 or any Linux box with a static IP.
 
 ### How It Compares
 
@@ -172,27 +172,43 @@ Three Podman containers. Three systemd services. One health check timer. No orch
 
 ## Quick Start
 
+### Option A: Go CLI (recommended)
+
+A single 6.8 MB binary — no bash, no Python, no envsubst needed at runtime.
+
 ```bash
 git clone https://github.com/ParkWardRR/zelira.git && cd zelira
+make build                           # or download from GitHub Releases
 
-# 1. Configure your network (or start from an example)
-cp config/env.example config/.env    # blank template
-# cp config/examples/apartment.env config/.env   # simple /24
-# cp config/examples/house.env config/.env       # /23 + DDNS
-# cp config/examples/homelab.env config/.env     # /16 + VLANs + TLS
-vi config/.env
+# 1. Interactive setup (detects interfaces, suggests IPs, generates .env)
+sudo ./zelira init
 
-# 2. Deploy core stack (DNS + DHCP)
-sudo ./deploy.sh
+# 2. Pre-flight check (validates config without deploying)
+sudo ./zelira validate
 
-# 3. Verify
-./scripts/health-check.sh
+# 3. Deploy core stack (DNS + DHCP)
+sudo ./zelira deploy
 
-# 4. Optional add-ons
-sudo ./scripts/deploy-ntp.sh         # NTP time server (Chrony)
-sudo ./scripts/deploy-ddns.sh        # Dynamic DNS updater
-sudo ./scripts/deploy-dashboard.sh   # Caddy dashboard + reverse proxy
+# 4. Verify everything
+./zelira health
+./zelira health --json               # machine-readable output
+
+# 5. Optional add-ons
+sudo ./zelira addon ntp               # NTP time server (Chrony)
+sudo ./zelira addon ddns              # Dynamic DNS updater
+sudo ./zelira addon dashboard         # Caddy reverse proxy + TLS
 ```
+
+### Option B: Shell scripts (legacy)
+
+```bash
+git clone https://github.com/ParkWardRR/zelira.git && cd zelira
+cp config/env.example config/.env && vi config/.env
+sudo ./deploy.sh
+./scripts/health-check.sh
+```
+
+### After deploying
 
 Then either:
 - Point your router's DHCP to hand out this host's IP as the DNS server, **or**
@@ -208,9 +224,11 @@ Then either:
 |-----------|---------|---------|-----|
 | Linux | Debian 12+, Ubuntu 22.04+, openSUSE 16+, Fedora 38+, AlmaLinux/RHEL 10+ | — | Host OS |
 | Podman | 4.0+ | `apt install podman` / `zypper install podman` / `dnf install podman` | Container runtime |
-| dig | any | `apt install dnsutils` / `zypper install bind-utils` | Health checks |
-| envsubst | any | `apt install gettext-base` / `zypper install gettext-runtime` | Kea config templating |
 | Static IP | — | Configure before deploying | This box IS your DNS/DHCP server |
+
+**If using the Go CLI binary** (recommended), that's all you need — `dig`, `envsubst`, and `python3` are no longer required at runtime. The binary embeds all configs and performs validation natively.
+
+**If using shell scripts** (legacy), you also need: `dig` (`dnsutils` / `bind-utils`), `envsubst` (`gettext-base` / `gettext-runtime`), and optionally `python3` for Kea JSON validation.
 
 ### Tested Platforms
 
@@ -218,8 +236,8 @@ Then either:
 |----------|-----|-----|--------|
 | Raspberry Pi 5 | BCM2712 (arm64) | 8 GB | ✅ Primary target |
 | Raspberry Pi 4 | BCM2711 (arm64) | 4 GB | ✅ Works (4 GB minimum) |
-| openSUSE Leap 16.0 | x86_64 | 2 GB | ✅ Validated (Phase 2 test host) |
-| AlmaLinux 10.1 | x86_64 | 2 GB | ✅ Validated (Go CLI + full stack) |
+| openSUSE Leap 16.0 | x86_64 | 2 GB | ✅ Validated (Phase 2) |
+| AlmaLinux 10.1 | x86_64 | 2 GB | ✅ Validated (Phase 7+8, 12/12 tests) |
 | Intel NUC | x86_64 | 8 GB | ✅ Works |
 | Proxmox VM | x86_64 | 2 GB+ | ✅ Works |
 | Any Debian/Ubuntu box | arm64 or amd64 | 2 GB+ | ✅ Should work |
@@ -230,39 +248,43 @@ Then either:
 
 ```
 zelira/
-├── deploy.sh                        # one-command deploy (idempotent)
+├── cmd/zelira/                       # CLI entry point
+│   ├── main.go
+│   └── commands/                     # cobra subcommands
+│       ├── root.go                   # global flags, version, findFile
+│       ├── deploy.go                 # native deploy (replaces deploy.sh)
+│       ├── health.go                 # health check engine
+│       ├── status.go                 # container + systemd status
+│       ├── addon.go                  # native add-on installer
+│       ├── validate.go               # pre-flight config check
+│       ├── init.go                   # interactive setup wizard
+│       ├── logs.go                   # unified log viewer
+│       ├── backup.go                 # backup + restore
+│       ├── update.go                 # pull + restart + verify
+│       ├── uninstall.go              # native uninstall + --purge
+│       └── doctor.go                 # deep diagnostics
+├── internal/
+│   ├── checker/                      # health check engine (DNS, NTP, ports, TLS)
+│   ├── config/                       # .env parser + IP/CIDR/pool validator
+│   ├── embedded/                     # go:embed configs (unbound, kea, healthcheck)
+│   └── engine/                       # Podman, systemd, networking, templating
 ├── config/
-│   ├── env.example                  # ← copy to .env and edit
-│   ├── unbound.conf                 # recursive DNS (production-tuned)
-│   ├── kea-dhcp4.conf.template      # DHCP config (templated from .env)
+│   ├── env.example                   # ← copy to .env and edit
+│   ├── unbound.conf                  # recursive DNS (production-tuned)
+│   ├── kea-dhcp4.conf.template       # DHCP config (templated from .env)
 │   └── examples/
-│       ├── apartment.env            # simple /24, 10-20 devices
-│       ├── house.env                # /23, DDNS, dashboard
-│       └── homelab.env              # /16 with VLANs, TLS, full add-ons
-├── scripts/
-│   ├── health-check.sh              # validate everything (core + add-ons)
-│   ├── dns-healthcheck.sh           # Unbound auto-restart on failure
-│   ├── deploy-ntp.sh                # add-on: Chrony NTP time server
-│   ├── deploy-ddns.sh               # add-on: Dynamic DNS (Namecheap/CF/DuckDNS)
-│   ├── deploy-dashboard.sh          # add-on: Caddy reverse proxy + dashboard
-│   └── uninstall.sh                 # clean removal
-├── systemd/
-│   ├── dns-healthcheck.service      # auto-recovery oneshot
-│   └── dns-healthcheck.timer        # runs every 2 min
-├── testing/
-│   ├── README.md                    # test environment setup + firewall safety
-│   └── results/                     # validation test logs
-├── docs/
-│   ├── ROADMAP.md                   # project history + forward plans
-│   ├── troubleshooting.md           # common issues + debug chain
-│   ├── advanced.md                  # DHCP reservations, monitoring, backup
-│   ├── migration-from-docker.md     # Docker Compose → Zelira migration
-│   ├── addon-ntp.md                 # NTP setup guide
-│   ├── addon-ddns.md                # Dynamic DNS setup guide
-│   ├── addon-dashboard.md           # Caddy + dashboard setup guide
-│   └── addon-metrics.md             # Prometheus + Grafana framework
-├── CONTRIBUTING.md                  # contributor guide + PR process
-├── LICENSE.md                       # Blue Oak Model License 1.0.0
+│       ├── apartment.env             # simple /24, 10-20 devices
+│       ├── house.env                 # /23, DDNS, dashboard
+│       └── homelab.env               # /16 with VLANs, TLS, full add-ons
+├── deploy.sh                         # legacy shell deploy (still works)
+├── scripts/                          # legacy shell scripts
+├── systemd/                          # timer + oneshot units
+├── testing/results/                  # validation test logs
+├── docs/                             # guides, roadmap, comparisons
+├── Makefile                          # build + cross-compile
+├── go.mod / go.sum
+├── CONTRIBUTING.md
+├── LICENSE.md
 └── README.md
 ```
 
@@ -542,7 +564,9 @@ journalctl -t dns-healthcheck --since "24 hours ago"
 ## Health Check
 
 ```bash
-./scripts/health-check.sh
+zelira health                 # human-readable output
+zelira health --json          # machine-readable (Prometheus/scripts)
+zelira doctor                 # deep diagnostics (connectivity, disk, TLS, NTP)
 ```
 
 Output (with NTP add-on deployed):
@@ -552,9 +576,9 @@ Zelira Health Check
 ═══════════════════
 
 Containers:
-  ✓ unbound (Up 18 minutes)
-  ✓ pihole (Up 18 minutes)
-  ✓ kea-dhcp4 (Up 18 minutes)
+  ✓ unbound (Up 12 seconds)
+  ✓ pihole (Up 8 seconds)
+  ✓ kea-dhcp4 (Up 8 seconds)
 
 Systemd:
   ✓ container-unbound
@@ -575,9 +599,9 @@ Ports:
   ✓ Port 67 (DHCP)
 
 NTP (Chrony):
-  ✓ 7 source(s) configured, 7 reachable
+  ✓ 3 source(s) configured, 3 reachable
   ✓ Stratum 3 (valid)
-  ✓ Clock offset: 0.004ms
+  ✓ Clock offset: 0.016ms
   ✓ Port 123/UDP (NTP) listening
 
 ═══════════════════
@@ -586,6 +610,24 @@ Status: HEALTHY
 ```
 
 The health check auto-detects deployed add-ons. Core-only installs show 15 checks; with NTP/DDNS/Caddy add-ons it expands up to 19+.
+
+### CLI Command Reference
+
+| Command | Description |
+|---------|-------------|
+| `zelira deploy` | Full stack deploy (idempotent, safe to re-run) |
+| `zelira health` | Run all health checks |
+| `zelira health --json` | Structured JSON output for monitoring |
+| `zelira status` | Container + systemd + add-on status |
+| `zelira validate` | Pre-flight config check (no deploy) |
+| `zelira init` | Interactive setup wizard → generates `.env` |
+| `zelira addon ntp\|ddns\|dashboard` | Deploy an add-on |
+| `zelira logs [-s pihole] [-f]` | Unified log viewer |
+| `zelira update` | Pull latest images + restart + verify |
+| `zelira backup [-o file.tar.gz]` | Export config + data |
+| `zelira restore <file.tar.gz>` | Restore from backup |
+| `zelira doctor` | Deep diagnostics |
+| `zelira uninstall [--purge]` | Remove services (optionally delete data) |
 
 ---
 
@@ -774,17 +816,18 @@ Edit `/srv/kea/etc-kea/kea-dhcp4.conf` and add entries to the `reservations` arr
 
 ## Further Reading
 
-- [Zelira vs. Alternatives](docs/comparison.md) — how Zelira compares to Pi-hole, AdGuard Home, and Technitium
-- [Roadmap](docs/ROADMAP.md) — project history, current validation status, forward-looking plans
-- [Migration from Docker Compose](docs/migration-from-docker.md) — step-by-step guide from Pi-hole Docker → Zelira
+- [Zelira vs. Alternatives](docs/comparison.md) — feature matrix vs Pi-hole, AdGuard Home, Technitium
+- [Roadmap](docs/ROADMAP.md) — project history (10 phases), completed + planned work
+- [Go CLI v0.2.0 Validation](testing/results/go-cli-v0.2.0-validation-2026-04-30.md) — 12/12 tests passed on AlmaLinux 10.1
+- [Migration from Docker Compose](docs/migration-from-docker.md) — step-by-step guide
 - [Troubleshooting](docs/troubleshooting.md) — common issues, debug chain, log commands
-- [Advanced Configuration](docs/advanced.md) — DHCP reservations, monitoring, backup, DNS-only mode, security hardening
-- [Add-on: NTP Time Server](docs/addon-ntp.md) — Chrony setup, DHCP Option 42, Prometheus metrics
-- [Add-on: Dynamic DNS](docs/addon-ddns.md) — Namecheap, Cloudflare, DuckDNS auto-updaters
-- [Add-on: Landing Page & Reverse Proxy](docs/addon-dashboard.md) — Caddy, auto-TLS, dashboard options
-- [Add-on: Observability & Metrics](docs/addon-metrics.md) — Prometheus exporters, Grafana dashboards
-- [Example Configs](config/examples/) — pre-built `.env` files for apartment, house, and homelab setups
-- [Contributing](CONTRIBUTING.md) — how to contribute, code style, PR process
+- [Advanced Configuration](docs/advanced.md) — DHCP reservations, monitoring, backup, DNS-only mode
+- [Add-on: NTP Time Server](docs/addon-ntp.md) — Chrony setup, DHCP Option 42
+- [Add-on: Dynamic DNS](docs/addon-ddns.md) — Namecheap, Cloudflare, DuckDNS
+- [Add-on: Dashboard](docs/addon-dashboard.md) — Caddy, auto-TLS, reverse proxy
+- [Add-on: Metrics](docs/addon-metrics.md) — Prometheus exporters, Grafana dashboards
+- [Example Configs](config/examples/) — pre-built `.env` files for apartment, house, homelab
+- [Contributing](CONTRIBUTING.md) — code style, PR process
 
 ---
 
